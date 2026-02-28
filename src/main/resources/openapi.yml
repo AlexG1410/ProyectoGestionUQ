@@ -1,0 +1,302 @@
+openapi: 3.0.3
+info:
+  title: API Gestión de Solicitudes Académicas
+  version: 1.0.0
+  description: API REST para sistema de triage y gestión de solicitudes académicas.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/solicitudes:
+    post:
+      summary: Registrar una solicitud académica
+      tags: [Solicitudes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudCreate'
+      responses:
+        '201':
+          description: Solicitud creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+        '400':
+          description: Error de validación
+
+    get:
+      summary: Consultar solicitudes por filtros
+      tags: [Solicitudes]
+      parameters:
+        - in: query
+          name: estado
+          schema: { type: string }
+        - in: query
+          name: tipo
+          schema: { type: string }
+        - in: query
+          name: prioridad
+          schema: { type: string }
+        - in: query
+          name: responsableId
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Lista de solicitudes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SolicitudResponse'
+
+  /api/solicitudes/{id}:
+    get:
+      summary: Obtener solicitud por ID
+      tags: [Solicitudes]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Solicitud encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+        '404':
+          description: No encontrada
+
+  /api/solicitudes/{id}/clasificar-priorizar:
+    put:
+      summary: Clasificar y priorizar solicitud
+      tags: [Solicitudes]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClasificarPriorizar'
+      responses:
+        '200':
+          description: Solicitud actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+
+  /api/solicitudes/{id}/asignar:
+    put:
+      summary: Asignar responsable
+      tags: [Solicitudes]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsignarResponsable'
+      responses:
+        '200':
+          description: Responsable asignado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+
+  /api/solicitudes/{id}/estado:
+    put:
+      summary: Cambiar estado de la solicitud
+      tags: [Solicitudes]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambiarEstado'
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+
+  /api/solicitudes/{id}/cerrar:
+    put:
+      summary: Cerrar solicitud
+      tags: [Solicitudes]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CerrarSolicitud'
+      responses:
+        '200':
+          description: Solicitud cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudResponse'
+
+  /api/solicitudes/{id}/historial:
+    get:
+      summary: Obtener historial de la solicitud
+      tags: [Historial]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Historial encontrado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistorialResponse'
+
+  /api/solicitudes/{id}/resumen:
+    get:
+      summary: Generar resumen asistido (IA opcional / fallback)
+      tags: [IA]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Resumen generado
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  parameters:
+    SolicitudId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    SolicitudCreate:
+      type: object
+      required: [tipoSolicitud, descripcion, canalOrigen, identificacionSolicitante]
+      properties:
+        tipoSolicitud:
+          type: string
+          example: HOMOLOGACION
+        descripcion:
+          type: string
+          example: Solicito homologación de Matemáticas I.
+        canalOrigen:
+          type: string
+          example: CORREO
+        identificacionSolicitante:
+          type: string
+          example: 1090XXXXXX
+        impactoAcademico:
+          type: string
+          example: Alto
+        fechaLimite:
+          type: string
+          format: date
+          example: 2026-03-10
+
+    ClasificarPriorizar:
+      type: object
+      required: [tipoSolicitud, prioridad, justificacionPrioridad]
+      properties:
+        tipoSolicitud:
+          type: string
+          example: HOMOLOGACION
+        prioridad:
+          type: string
+          example: ALTA
+        justificacionPrioridad:
+          type: string
+          example: El estudiante tiene fecha de matrícula próxima.
+
+    AsignarResponsable:
+      type: object
+      required: [responsableId]
+      properties:
+        responsableId:
+          type: integer
+          format: int64
+          example: 2
+
+    CambiarEstado:
+      type: object
+      required: [nuevoEstado]
+      properties:
+        nuevoEstado:
+          type: string
+          example: EN_ATENCION
+        observacion:
+          type: string
+          example: Se inició revisión documental.
+
+    CerrarSolicitud:
+      type: object
+      required: [observacionCierre]
+      properties:
+        observacionCierre:
+          type: string
+          example: Solicitud atendida y notificada al estudiante.
+
+    SolicitudResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tipoSolicitud:
+          type: string
+        descripcion:
+          type: string
+        canalOrigen:
+          type: string
+        fechaHoraRegistro:
+          type: string
+          format: date-time
+        identificacionSolicitante:
+          type: string
+        estado:
+          type: string
+        prioridad:
+          type: string
+          nullable: true
+        justificacionPrioridad:
+          type: string
+          nullable: true
+        responsable:
+          type: string
+          nullable: true
+        cerrada:
+          type: boolean
+
+    HistorialResponse:
+      type: object
+      properties:
+        fechaHora:
+          type: string
+          format: date-time
+        accion:
+          type: string
+        usuarioResponsable:
+          type: string
+        observaciones:
+          type: string
