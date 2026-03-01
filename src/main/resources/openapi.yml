@@ -7,6 +7,9 @@ info:
 servers:
   - url: http://localhost:8080
 
+security:
+  - basicAuth: []
+
 paths:
   /api/solicitudes:
     post:
@@ -181,6 +184,10 @@ paths:
                 type: string
 
 components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
   parameters:
     SolicitudId:
       name: id

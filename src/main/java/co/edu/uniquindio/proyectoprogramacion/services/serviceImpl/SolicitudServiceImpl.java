@@ -88,6 +88,11 @@ public class SolicitudServiceImpl implements SolicitudService {
         if (!responsable.isActivo()) {
             throw new BusinessException("No se puede asignar un responsable inactivo");
         }
+        if (responsable.getRol() == null ||
+                !(responsable.getRol().name().equals("ADMINISTRATIVO") ||
+                        responsable.getRol().name().equals("COORDINADOR"))) {
+            throw new BusinessException("Solo se puede asignar a usuarios con rol ADMINISTRATIVO o COORDINADOR");
+        }
 
         solicitud.setResponsableAsignado(responsable);
         solicitudRepository.save(solicitud);
