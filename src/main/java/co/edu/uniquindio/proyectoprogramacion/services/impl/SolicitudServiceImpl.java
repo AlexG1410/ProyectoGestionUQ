@@ -1,6 +1,10 @@
-package co.edu.uniquindio.proyectoprogramacion.services.serviceImpl;
+package co.edu.uniquindio.proyectoprogramacion.services.impl;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.*;
+import co.edu.uniquindio.proyectoprogramacion.repositories.spec.SolicitudSpecifications;
+import org.springframework.data.jpa.domain.Specification;
+import co.edu.uniquindio.proyectoprogramacion.mappers.SolicitudMapper;
+import co.edu.uniquindio.proyectoprogramacion.mappers.HistorialMapper;
 import co.edu.uniquindio.proyectoprogramacion.exceptions.BusinessException;
 import co.edu.uniquindio.proyectoprogramacion.exceptions.ResourceNotFoundException;
 import co.edu.uniquindio.proyectoprogramacion.model.*;
@@ -29,6 +33,8 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final HistorialSolicitudRepository historialRepository;
     private final UsuarioRepository usuarioRepository;
     private final SolicitudStateValidator stateValidator;
+    private final SolicitudMapper solicitudMapper;
+    private final HistorialMapper historialMapper;
 
     @Override
     public SolicitudResponseDTO registrar(SolicitudCreateDTO dto, String usuarioActor) {
@@ -51,7 +57,7 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         registrarHistorial(solicitud, "REGISTRO", usuarioActor, "Solicitud registrada");
 
-        return toResponse(solicitud);
+        return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
@@ -74,7 +80,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         registrarHistorial(solicitud, "CLASIFICACION_PRIORIZACION", usuarioActor,
                 "Tipo=" + dto.getTipoSolicitud() + ", Prioridad=" + dto.getPrioridad());
 
-        return toResponse(solicitud);
+        return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
@@ -100,7 +106,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         registrarHistorial(solicitud, "ASIGNACION", usuarioActor,
                 "Asignado a " + responsable.getUsername());
 
-        return toResponse(solicitud);
+        return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
@@ -119,7 +125,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         registrarHistorial(solicitud, "CAMBIO_ESTADO", usuarioActor,
                 (dto.getObservacion() == null ? "" : dto.getObservacion()));
 
-        return toResponse(solicitud);
+        return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
@@ -141,27 +147,28 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         registrarHistorial(solicitud, "CIERRE", usuarioActor, dto.getObservacionCierre());
 
-        return toResponse(solicitud);
+        return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
     @Transactional(readOnly = true)
     public SolicitudResponseDTO obtenerPorId(Long id) {
-        return toResponse(getSolicitud(id));
+        return solicitudMapper.toResponse(getSolicitud(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SolicitudResponseDTO> consultar(String estado, String tipo, String prioridad, Long responsableId) {
-        List<SolicitudAcademica> lista = solicitudRepository.findAll();
 
-        return lista.stream()
-                .filter(s -> estado == null || s.getEstado().name().equalsIgnoreCase(estado))
-                .filter(s -> tipo == null || s.getTipoSolicitud().name().equalsIgnoreCase(tipo))
-                .filter(s -> prioridad == null || (s.getPrioridad() != null && s.getPrioridad().name().equalsIgnoreCase(prioridad)))
-                .filter(s -> responsableId == null || (s.getResponsableAsignado() != null && s.getResponsableAsignado().getId().equals(responsableId)))
+        Specification<SolicitudAcademica> spec = Specification
+                .where(SolicitudSpecifications.conEstado(estado))
+                .and(SolicitudSpecifications.conTipo(tipo))
+                .and(SolicitudSpecifications.conPrioridad(prioridad))
+                .and(SolicitudSpecifications.conResponsableId(responsableId));
+
+        return solicitudRepository.findAll(spec).stream()
                 .sorted(Comparator.comparing(SolicitudAcademica::getFechaHoraRegistro).reversed())
-                .map(this::toResponse)
+                .map(solicitudMapper::toResponse)
                 .collect(Collectors.toList());
     }
 
@@ -171,12 +178,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         getSolicitud(solicitudId); // valida existencia
         return historialRepository.findBySolicitud_IdOrderByFechaHoraAsc(solicitudId)
                 .stream()
-                .map(h -> HistorialResponseDTO.builder()
-                        .fechaHora(h.getFechaHora())
-                        .accion(h.getAccion())
-                        .usuarioResponsable(h.getUsuarioResponsable())
-                        .observaciones(h.getObservaciones())
-                        .build())
+                .map(historialMapper::toResponse)
                 .toList();
     }
 
@@ -220,19 +222,4 @@ public class SolicitudServiceImpl implements SolicitudService {
         historialRepository.save(h);
     }
 
-    private SolicitudResponseDTO toResponse(SolicitudAcademica s) {
-        return SolicitudResponseDTO.builder()
-                .id(s.getId())
-                .tipoSolicitud(s.getTipoSolicitud() != null ? s.getTipoSolicitud().name() : null)
-                .descripcion(s.getDescripcion())
-                .canalOrigen(s.getCanalOrigen() != null ? s.getCanalOrigen().name() : null)
-                .fechaHoraRegistro(s.getFechaHoraRegistro())
-                .identificacionSolicitante(s.getIdentificacionSolicitante())
-                .estado(s.getEstado() != null ? s.getEstado().name() : null)
-                .prioridad(s.getPrioridad() != null ? s.getPrioridad().name() : null)
-                .justificacionPrioridad(s.getJustificacionPrioridad())
-                .responsable(s.getResponsableAsignado() != null ? s.getResponsableAsignado().getUsername() : null)
-                .cerrada(s.isCerrada())
-                .build();
-    }
 }

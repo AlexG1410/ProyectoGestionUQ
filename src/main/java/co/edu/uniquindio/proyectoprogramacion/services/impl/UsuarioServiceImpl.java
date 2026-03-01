@@ -1,7 +1,8 @@
-package co.edu.uniquindio.proyectoprogramacion.services.serviceImpl;
+package co.edu.uniquindio.proyectoprogramacion.services.impl;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.UsuarioSimpleDTO;
 import co.edu.uniquindio.proyectoprogramacion.model.Usuario;
+import co.edu.uniquindio.proyectoprogramacion.mappers.UsuarioMapper;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import co.edu.uniquindio.proyectoprogramacion.repositories.UsuarioRepository;
 import co.edu.uniquindio.proyectoprogramacion.services.UsuarioService;
@@ -18,6 +19,7 @@ import java.util.List;
 public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final UsuarioMapper usuarioMapper;
 
     @Override
     public List<UsuarioSimpleDTO> listarResponsablesActivos() {
@@ -25,19 +27,9 @@ public class UsuarioServiceImpl implements UsuarioService {
         List<Usuario> coords = usuarioRepository.findByRolAndActivoTrue(RolUsuario.COORDINADOR);
 
         List<UsuarioSimpleDTO> salida = new ArrayList<>();
-        admins.forEach(u -> salida.add(map(u)));
-        coords.forEach(u -> salida.add(map(u)));
+        admins.forEach(u -> salida.add(usuarioMapper.toSimpleDTO(u)));
+        coords.forEach(u -> salida.add(usuarioMapper.toSimpleDTO(u)));
 
         return salida;
-    }
-
-    private UsuarioSimpleDTO map(Usuario u) {
-        return UsuarioSimpleDTO.builder()
-                .id(u.getId())
-                .username(u.getUsername())
-                .nombreCompleto(u.getNombreCompleto())
-                .rol(u.getRol().name())
-                .activo(u.isActivo())
-                .build();
     }
 }
