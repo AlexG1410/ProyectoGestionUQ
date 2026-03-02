@@ -2,6 +2,7 @@ package co.edu.uniquindio.proyectoprogramacion.controllers;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.AuthMeResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.common.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -57,6 +58,7 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Datos inválidos"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Credenciales inválidas")
     })
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
         LoginResponseDTO response = authService.login(request);
