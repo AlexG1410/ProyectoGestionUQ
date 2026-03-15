@@ -1,7 +1,7 @@
 package co.edu.uniquindio.proyectoprogramacion.validators;
 
-import co.edu.uniquindio.proyectoprogramacion.exceptions.BusinessException;
-import co.edu.uniquindio.proyectoprogramacion.model.enums.EstadoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.exception.BusinessRuleException;
+import co.edu.uniquindio.proyectoprogramacion.model.enumx.EstadoSolicitud;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,14 +25,14 @@ class SolicitudStateValidatorTest {
 
     @Test
     void debeLanzarExcepcionEnTransicionInvalidaDeRegistradaAAtendida() {
-        assertThrows(BusinessException.class, () ->
+        assertThrows(BusinessRuleException.class, () ->
                 validator.validarTransicion(EstadoSolicitud.REGISTRADA, EstadoSolicitud.ATENDIDA)
         );
     }
 
     @Test
     void noDebePermitirCambiosDesdeCerrada() {
-        assertThrows(BusinessException.class, () ->
+        assertThrows(BusinessRuleException.class, () ->
                 validator.validarTransicion(EstadoSolicitud.CERRADA, EstadoSolicitud.EN_ATENCION)
         );
     }

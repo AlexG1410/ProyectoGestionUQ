@@ -1,7 +1,7 @@
 package co.edu.uniquindio.proyectoprogramacion.validators;
 
-import co.edu.uniquindio.proyectoprogramacion.exceptions.BusinessException;
-import co.edu.uniquindio.proyectoprogramacion.model.enums.EstadoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.exception.BusinessRuleException;
+import co.edu.uniquindio.proyectoprogramacion.model.enumx.EstadoSolicitud;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -20,7 +20,7 @@ public class SolicitudStateValidator {
 
     public void validarTransicion(EstadoSolicitud actual, EstadoSolicitud nuevo) {
         if (!TRANSICIONES.getOrDefault(actual, Set.of()).contains(nuevo)) {
-            throw new BusinessException("Transición inválida: " + actual + " -> " + nuevo);
+            throw new BusinessRuleException("Transición inválida: " + actual + " -> " + nuevo);
         }
     }
 }
