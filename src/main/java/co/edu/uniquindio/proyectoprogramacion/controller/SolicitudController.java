@@ -3,158 +3,232 @@ package co.edu.uniquindio.proyectoprogramacion.controller;
 import co.edu.uniquindio.proyectoprogramacion.dto.common.ApiResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.historial.HistorialResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.solicitud.*;
-import co.edu.uniquindio.proyectoprogramacion.dto.usuario.UsuarioSimpleDTO;
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.*;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.EstadoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.Prioridad;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.TipoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.security.CustomUserDetails;
 import co.edu.uniquindio.proyectoprogramacion.service.SolicitudService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/solicitudes")
 @RequiredArgsConstructor
 public class SolicitudController {
 
     private final SolicitudService solicitudService;
 
-    @PostMapping("/solicitudes")
-    public ApiResponseDTO<SolicitudResponseDTO> crear(@Valid @RequestBody SolicitudCreateDTO request) {
-        return response("Solicitud registrada correctamente", solicitudService.crearSolicitud(request));
+    /**
+     * Obtiene el ID del usuario autenticado desde el JWT
+     */
+    private UUID getUsuarioId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails) {
+            return ((CustomUserDetails) auth.getPrincipal()).getId();
+        }
+        throw new IllegalStateException("Usuario no autenticado");
     }
 
-    @GetMapping("/solicitudes")
-    public ApiResponseDTO<Page<SolicitudResponseDTO>> consultarSolicitudes(
-            @RequestParam(required = false) EstadoSolicitud estado,
-            @RequestParam(required = false) TipoSolicitud tipoSolicitud,
-            @RequestParam(required = false) Prioridad prioridad,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "fechaHoraRegistro,desc") String sort) {
+    /**
+     * POST /api/solicitudes - Registrar nueva solicitud
+     * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR
+     */
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> registrar(
+            @Valid @RequestBody SolicitudCreateDTO dto) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.registrar(dto, usuarioId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                        .success(true)
+                        .message("Solicitud registrada correctamente")
+                        .data(response)
+                        .build());
+    }
 
-        String[] sortParts = sort.split(",");
-        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
-
-        return ApiResponseDTO.<Page<SolicitudResponseDTO>>builder()
-                .success(true)
-                .message("Consulta realizada correctamente")
-                .timestamp(LocalDateTime.now())
-                .data(solicitudService.consultarSolicitudes(estado, tipoSolicitud, prioridad, responsableId, pageable))
+    /**
+     * GET /api/solicitudes - Consultar solicitudes con filtros
+     * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
+    public ResponseEntity<ApiResponseDTO<List<SolicitudResponseDTO>>> consultar(
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String prioridad,
+            @RequestParam(required = false) UUID responsableId) {
+        
+        // Convertir strings a enums de manera segura
+        EstadoSolicitud estadoEnum = null;
+        TipoSolicitud tipoEnum = null;
+        Prioridad prioridadEnum = null;
+        
+        if (estado != null && !estado.isEmpty()) {
+            try {
+                estadoEnum = EstadoSolicitud.valueOf(estado.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Si el valor no es válido, ignorar y buscar sin este filtro
+            }
+        }
+        
+        if (tipo != null && !tipo.isEmpty()) {
+            try {
+                tipoEnum = TipoSolicitud.valueOf(tipo.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Si el valor no es válido, ignorar y buscar sin este filtro
+            }
+        }
+        
+        if (prioridad != null && !prioridad.isEmpty()) {
+            try {
+                prioridadEnum = Prioridad.valueOf(prioridad.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Si el valor no es válido, ignorar y buscar sin este filtro
+            }
+        }
+        
+        FiltroSolicitudesDTO filtro = FiltroSolicitudesDTO.builder()
+                .estado(estadoEnum)
+                .tipo(tipoEnum)
+                .prioridad(prioridadEnum)
+                .responsableId(responsableId)
                 .build();
+        
+        List<SolicitudResponseDTO> response = solicitudService.consultar(filtro);
+        return ResponseEntity.ok(ApiResponseDTO.<List<SolicitudResponseDTO>>builder()
+                .success(true)
+                .message("Solicitudes consultadas correctamente")
+                .data(response)
+                .build());
     }
 
-    @GetMapping("/solicitudes/{id}")
-    public ApiResponseDTO<SolicitudResponseDTO> obtener(@PathVariable Long id) {
-        return response("Solicitud encontrada", solicitudService.obtenerPorId(id));
+    /**
+     * GET /api/solicitudes/{id} - Obtener solicitud por ID
+     * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> obtenerPorId(@PathVariable UUID id) {
+        SolicitudResponseDTO response = solicitudService.obtenerPorId(id);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Solicitud obtenida correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/clasificar")
-    public ApiResponseDTO<SolicitudResponseDTO> clasificar(@PathVariable Long id,
-                                                           @Valid @RequestBody ClasificarSolicitudRequestDTO request) {
-        return response("Solicitud clasificada correctamente", solicitudService.clasificar(id, request));
+    /**
+     * PUT /api/solicitudes/{id}/clasificar-priorizar - Clasificar y priorizar solicitud
+     * Roles: ADMINISTRATIVO, COORDINADOR
+     */
+    @PutMapping("/{id}/clasificar-priorizar")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> clasificarPriorizar(
+            @PathVariable UUID id,
+            @Valid @RequestBody ClasificarPriorizarDTO dto) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.clasificarPriorizar(id, dto, usuarioId);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Solicitud clasificada y priorizada correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/priorizar")
-    public ApiResponseDTO<SolicitudResponseDTO> priorizar(@PathVariable Long id,
-                                                          @Valid @RequestBody PriorizarSolicitudRequestDTO request) {
-        return response("Solicitud priorizada correctamente", solicitudService.priorizar(id, request));
+    /**
+     * PUT /api/solicitudes/{id}/asignar - Asignar responsable a solicitud
+     * Roles: ADMINISTRATIVO, COORDINADOR
+     */
+    @PutMapping("/{id}/asignar")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> asignarResponsable(
+            @PathVariable UUID id,
+            @Valid @RequestBody AsignarResponsableDTO dto) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.asignarResponsable(id, dto, usuarioId);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Responsable asignado correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/asignar")
-    public ApiResponseDTO<SolicitudResponseDTO> asignar(@PathVariable Long id,
-                                                        @Valid @RequestBody AsignarResponsableRequestDTO request) {
-        return response("Responsable asignado correctamente", solicitudService.asignar(id, request));
+    /**
+     * PUT /api/solicitudes/{id}/iniciar-atencion - Iniciar atención de solicitud
+     * Roles: ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     */
+    @PutMapping("/{id}/iniciar-atencion")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> iniciarAtencion(
+            @PathVariable UUID id,
+            @RequestParam(required = false, defaultValue = "") String observacion) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.iniciarAtencion(id, observacion, usuarioId);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Atención iniciada correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/iniciar-atencion")
-    public ApiResponseDTO<SolicitudResponseDTO> iniciarAtencion(@PathVariable Long id,
-                                                                @RequestBody(required = false) ObservacionRequestDTO request) {
-        return response("Solicitud pasada a EN_ATENCION correctamente", solicitudService.iniciarAtencion(id, request));
+    /**
+     * PUT /api/solicitudes/{id}/marcar-atendida - Marcar solicitud como atendida
+     * Roles: ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     */
+    @PutMapping("/{id}/marcar-atendida")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> marcarAtendida(
+            @PathVariable UUID id,
+            @Valid @RequestBody MarcarAtendidoDTO dto) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.marcarAtendida(id, dto, usuarioId);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Solicitud marcada como atendida correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/marcar-atendida")
-    public ApiResponseDTO<SolicitudResponseDTO> marcarAtendida(@PathVariable Long id,
-                                                               @RequestBody(required = false) ObservacionRequestDTO request) {
-        return response("Solicitud marcada como atendida", solicitudService.marcarAtendida(id, request));
+    /**
+     * PUT /api/solicitudes/{id}/cerrar - Cerrar solicitud
+     * Roles: ADMINISTRATIVO, COORDINADOR
+     */
+    @PutMapping("/{id}/cerrar")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR')")
+    public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> cerrar(
+            @PathVariable UUID id,
+            @Valid @RequestBody CerrarSolicitudDTO dto) {
+        UUID usuarioId = getUsuarioId();
+        SolicitudResponseDTO response = solicitudService.cerrar(id, dto, usuarioId);
+        return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
+                .success(true)
+                .message("Solicitud cerrada correctamente")
+                .data(response)
+                .build());
     }
 
-    @PutMapping("/solicitudes/{id}/cerrar")
-    public ApiResponseDTO<SolicitudResponseDTO> cerrar(@PathVariable Long id,
-                                                       @Valid @RequestBody CerrarSolicitudRequestDTO request) {
-        return response("Solicitud cerrada correctamente", solicitudService.cerrar(id, request));
-    }
-
-    @GetMapping("/solicitudes/{id}/historial")
-    public ApiResponseDTO<List<HistorialResponseDTO>> historial(@PathVariable Long id) {
-        return ApiResponseDTO.<List<HistorialResponseDTO>>builder()
+    /**
+     * GET /api/solicitudes/{id}/historial - Obtener historial de solicitud
+     * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     */
+    @GetMapping("/{id}/historial")
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
+    public ResponseEntity<ApiResponseDTO<List<HistorialResponseDTO>>> historial(@PathVariable UUID id) {
+        List<HistorialResponseDTO> response = solicitudService.historial(id);
+        return ResponseEntity.ok(ApiResponseDTO.<List<HistorialResponseDTO>>builder()
                 .success(true)
                 .message("Historial obtenido correctamente")
-                .timestamp(LocalDateTime.now())
-                .data(solicitudService.historial(id))
-                .build();
-    }
-
-    @PostMapping("/solicitudes/sugerir-clasificacion-prioridad")
-    public ApiResponseDTO<SugerirClasificacionPrioridadResponseDTO> sugerirClasificacionPrioridad(
-            @Valid @RequestBody SugerirClasificacionPrioridadRequestDTO request) {
-        return ApiResponseDTO.<SugerirClasificacionPrioridadResponseDTO>builder()
-                .success(true)
-                .message("Sugerencia generada correctamente")
-                .timestamp(LocalDateTime.now())
-                .data(solicitudService.sugerirClasificacionPrioridad(request))
-                .build();
-    }
-
-    @GetMapping("/usuarios/responsables-activos")
-    public ApiResponseDTO<List<UsuarioSimpleDTO>> responsablesActivos() {
-        return ApiResponseDTO.<List<UsuarioSimpleDTO>>builder()
-                .success(true)
-                .message("Responsables activos obtenidos correctamente")
-                .timestamp(LocalDateTime.now())
-                .data(solicitudService.responsablesActivos())
-                .build();
-    }
-
-    @GetMapping("/mis-solicitudes")
-    public ApiResponseDTO<Page<SolicitudResponseDTO>> misSolicitudes(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "fechaHoraRegistro,desc") String sort) {
-
-        String[] sortParts = sort.split(",");
-        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
-
-        return ApiResponseDTO.<Page<SolicitudResponseDTO>>builder()
-                .success(true)
-                .message("Solicitudes obtenidas correctamente")
-                .timestamp(LocalDateTime.now())
-                .data(solicitudService.misSolicitudes(pageable))
-                .build();
-    }
-
-    @GetMapping("/mis-solicitudes/{id}")
-    public ApiResponseDTO<SolicitudResponseDTO> miSolicitud(@PathVariable Long id) {
-        return response("Solicitud obtenida correctamente", solicitudService.miSolicitudPorId(id));
-    }
-
-    private ApiResponseDTO<SolicitudResponseDTO> response(String message, SolicitudResponseDTO data) {
-        return ApiResponseDTO.<SolicitudResponseDTO>builder()
-                .success(true)
-                .message(message)
-                .timestamp(LocalDateTime.now())
-                .data(data)
-                .build();
+                .data(response)
+                .build());
     }
 }

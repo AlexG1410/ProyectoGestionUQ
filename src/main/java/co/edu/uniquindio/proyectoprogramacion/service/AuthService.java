@@ -2,8 +2,9 @@ package co.edu.uniquindio.proyectoprogramacion.service;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.*;
 
+import java.util.UUID;
+
 public interface AuthService {
-    AuthMeResponseDTO register(RegisterRequestDTO request);
-    LoginResponseDTO login(LoginRequestDTO request);
-    AuthMeResponseDTO me();
+    LoginResponseDTO login(LoginRequestDTO dto);
+    AuthMeResponseDTO me(UUID userId);
 }

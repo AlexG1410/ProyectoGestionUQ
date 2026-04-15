@@ -1,6 +1,6 @@
 package co.edu.uniquindio.proyectoprogramacion.dto.auth;
 
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.RolUsuario;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import lombok.*;
 
 import java.util.List;

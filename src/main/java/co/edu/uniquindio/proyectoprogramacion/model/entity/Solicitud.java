@@ -1,24 +1,27 @@
 package co.edu.uniquindio.proyectoprogramacion.model.entity;
 
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.*;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
-
+import co.edu.uniquindio.proyectoprogramacion.exception.BusinessException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
+import jakarta.persistence.*;
+
 
 @Entity
 @Table(name = "solicitudes")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Solicitud {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue
+    private UUID id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private TipoSolicitud tipoSolicitud;
 
     @Column(nullable = false, length = 2000)
     private String descripcion;
@@ -28,18 +31,13 @@ public class Solicitud {
     private CanalOrigen canalOrigen;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 40)
-    private TipoSolicitud tipoSolicitud;
-
-    @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private ImpactoAcademico impactoAcademico;
 
     private LocalDate fechaLimite;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private EstadoSolicitud estado;
+    @Column(nullable = false)
+    private LocalDateTime fechaHoraRegistro;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -48,7 +46,16 @@ public class Solicitud {
     @Column(length = 500)
     private String justificacionPrioridad;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private EstadoSolicitud estado;
+
+    private LocalDateTime fechaCierre;
+
+    @Column(length = 1000)
+    private String observacionCierre;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "solicitante_id", nullable = false)
     private Usuario solicitante;
 
@@ -56,12 +63,13 @@ public class Solicitud {
     @JoinColumn(name = "responsable_id")
     private Usuario responsable;
 
-    @Column(nullable = false)
-    private Boolean cerrada;
+    public boolean estaCerrada() {
+        return EstadoSolicitud.CERRADA.equals(this.estado);
+    }
 
-    private LocalDateTime fechaHoraRegistro;
-    private LocalDateTime fechaCierre;
-
-    @Column(length = 1000)
-    private String observacionCierre;
+    public void validarModificable() {
+        if (estaCerrada()) {
+            throw new BusinessException("La solicitud está cerrada y no puede modificarse");
+        }
+    }
 }

@@ -5,25 +5,17 @@ import co.edu.uniquindio.proyectoprogramacion.model.entity.HistorialSolicitud;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import org.springframework.stereotype.Component;
+
 @Component
-@RequiredArgsConstructor
 public class HistorialMapper {
 
-    private final UsuarioMapper usuarioMapper;
-
-    public HistorialResponseDTO toHistorialResponseDTO(HistorialSolicitud historial) {
-        if (historial == null) return null;
-
+    public HistorialResponseDTO toResponse(HistorialSolicitud historial) {
         return HistorialResponseDTO.builder()
-                .id(historial.getId())
                 .fechaHora(historial.getFechaHora())
                 .accion(historial.getAccion())
-                .usuarioResponsable(usuarioMapper.toUsuarioSimpleRefDTO(historial.getUsuarioResponsable()))
+                .usuarioResponsable(historial.getActor().getUsername())
                 .observaciones(historial.getObservaciones())
-                .estadoAnterior(historial.getEstadoAnterior())
-                .estadoNuevo(historial.getEstadoNuevo())
-                .prioridadAnterior(historial.getPrioridadAnterior())
-                .prioridadNueva(historial.getPrioridadNueva())
                 .build();
     }
 }

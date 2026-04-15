@@ -1,55 +1,39 @@
 package co.edu.uniquindio.proyectoprogramacion.model.entity;
 
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.*;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.AccionHistorial;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "historial_solicitudes")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Table(name = "historial_solicitud")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class HistorialSolicitud {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue
+    private UUID id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "solicitud_id", nullable = false)
     private Solicitud solicitud;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "usuario_responsable_id", nullable = false)
-    private Usuario usuarioResponsable;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "actor_id", nullable = false)
+    private Usuario actor;
+
+    @Column(nullable = false)
+    private LocalDateTime fechaHora;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private AccionHistorial accion;
 
     @Column(length = 500)
+    private String detalle;
+
+    @Column(length = 1000)
     private String observaciones;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 30)
-    private EstadoSolicitud estadoAnterior;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 30)
-    private EstadoSolicitud estadoNuevo;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private Prioridad prioridadAnterior;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private Prioridad prioridadNueva;
-
-    @Column(nullable = false)
-    private LocalDateTime fechaHora;
 }

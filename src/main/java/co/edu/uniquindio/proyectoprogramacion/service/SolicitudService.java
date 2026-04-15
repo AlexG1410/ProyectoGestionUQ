@@ -2,34 +2,17 @@ package co.edu.uniquindio.proyectoprogramacion.service;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.historial.HistorialResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.solicitud.*;
-import co.edu.uniquindio.proyectoprogramacion.dto.usuario.UsuarioSimpleDTO;
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
-import java.util.List;
+import java.util.*;
 
 public interface SolicitudService {
-    SolicitudResponseDTO crearSolicitud(SolicitudCreateDTO request);
-    SolicitudResponseDTO clasificar(Long id, ClasificarSolicitudRequestDTO request);
-    SolicitudResponseDTO priorizar(Long id, PriorizarSolicitudRequestDTO request);
-    SolicitudResponseDTO asignar(Long id, AsignarResponsableRequestDTO request);
-    SolicitudResponseDTO iniciarAtencion(Long id, ObservacionRequestDTO request);
-    SolicitudResponseDTO marcarAtendida(Long id, ObservacionRequestDTO request);
-    SolicitudResponseDTO cerrar(Long id, CerrarSolicitudRequestDTO request);
-    SolicitudResponseDTO obtenerPorId(Long id);
-
-    Page<SolicitudResponseDTO> consultarSolicitudes(
-            EstadoSolicitud estado,
-            TipoSolicitud tipoSolicitud,
-            Prioridad prioridad,
-            Long responsableId,
-            Pageable pageable
-    );
-
-    Page<SolicitudResponseDTO> misSolicitudes(Pageable pageable);
-    SolicitudResponseDTO miSolicitudPorId(Long id);
-    List<HistorialResponseDTO> historial(Long id);
-    List<UsuarioSimpleDTO> responsablesActivos();
-    SugerirClasificacionPrioridadResponseDTO sugerirClasificacionPrioridad(SugerirClasificacionPrioridadRequestDTO request);
+    SolicitudResponseDTO registrar(SolicitudCreateDTO dto, UUID actorId);
+    List<SolicitudResponseDTO> consultar(FiltroSolicitudesDTO filtro);
+    SolicitudResponseDTO obtenerPorId(UUID solicitudId);
+    SolicitudResponseDTO clasificarPriorizar(UUID solicitudId, ClasificarPriorizarDTO dto, UUID actorId);
+    SolicitudResponseDTO asignarResponsable(UUID solicitudId, AsignarResponsableDTO dto, UUID actorId);
+    SolicitudResponseDTO iniciarAtencion(UUID solicitudId, String observacion, UUID actorId);
+    SolicitudResponseDTO marcarAtendida(UUID solicitudId, MarcarAtendidoDTO dto, UUID actorId);
+    SolicitudResponseDTO cerrar(UUID solicitudId, CerrarSolicitudDTO dto, UUID actorId);
+    List<HistorialResponseDTO> historial(UUID solicitudId);
 }

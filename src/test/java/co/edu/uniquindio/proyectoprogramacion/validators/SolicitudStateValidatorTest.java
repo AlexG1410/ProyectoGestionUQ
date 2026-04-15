@@ -1,7 +1,7 @@
 package co.edu.uniquindio.proyectoprogramacion.validators;
 
 import co.edu.uniquindio.proyectoprogramacion.exception.BusinessRuleException;
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.EstadoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.EstadoSolicitud;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

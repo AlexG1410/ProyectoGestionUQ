@@ -1,28 +1,21 @@
 package co.edu.uniquindio.proyectoprogramacion.dto.solicitud;
 
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.CanalOrigen;
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.ImpactoAcademico;
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.TipoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.CanalOrigen;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.ImpactoAcademico;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.TipoSolicitud;
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.Setter;
-
+import lombok.*;
 import java.time.LocalDate;
 
-@Getter
-@Setter
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class SolicitudCreateDTO {
-
+    @NotNull
     private TipoSolicitud tipoSolicitud;
-
-    @NotBlank(message = "La descripción es obligatoria")
-    @Size(min = 10, max = 2000, message = "La descripción debe tener entre 10 y 2000 caracteres")
+    @NotBlank
+    @Size(min = 10, max = 2000)
     private String descripcion;
-
-    @NotNull(message = "El canal de origen es obligatorio")
+    @NotNull
     private CanalOrigen canalOrigen;
-
     private ImpactoAcademico impactoAcademico;
-
     private LocalDate fechaLimite;
 }

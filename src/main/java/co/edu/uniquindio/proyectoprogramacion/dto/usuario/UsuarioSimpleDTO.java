@@ -1,7 +1,8 @@
 package co.edu.uniquindio.proyectoprogramacion.dto.usuario;
 
-import co.edu.uniquindio.proyectoprogramacion.model.enumx.RolUsuario;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import lombok.*;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -9,7 +10,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UsuarioSimpleDTO {
-    private Long id;
+    private UUID id;
     private String username;
     private String nombreCompleto;
     private RolUsuario rol;
