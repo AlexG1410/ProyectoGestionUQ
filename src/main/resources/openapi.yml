@@ -349,8 +349,12 @@ paths:
       tags: [Solicitudes]
       summary: Obtener solicitud por ID
       description: |
-        Obtiene el detalle de una solicitud académica.
-        Roles permitidos: ADMINISTRATIVO, COORDINADOR, CONSULTOR.
+        Obtiene el detalle de una solicitud académica por su ID.
+        
+        **Validación de propiedad**: Un ESTUDIANTE solo puede consultar sus propias solicitudes.
+        Si intenta acceder a una solicitud ajena, retorna 404.
+        
+        Roles permitidos: ESTUDIANTE (solo propias), ADMINISTRATIVO, COORDINADOR, CONSULTOR.
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       responses:
@@ -361,7 +365,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseSolicitudResponse'
         '404':
-          description: Solicitud no encontrada
+          description: Solicitud no encontrada o (para ESTUDIANTE) no pertenece al usuario
           content:
             application/json:
               schema:
@@ -384,13 +388,19 @@ paths:
       tags: [Solicitudes]
       summary: Clasificar y priorizar solicitud
       description: |
-        Define o ajusta el tipo de solicitud y la prioridad de atención.
-        Esta operación mueve la solicitud a estado CLASIFICADA según reglas del backend.
+        Define el tipo de solicitud y calcula/ajusta la prioridad de atención.
+        Esta operación mueve la solicitud a estado CLASIFICADA.
+        
+        **Priorización automática**: Si no se proporciona prioridad ni justificación, se calculan 
+        automáticamente usando el motor de reglas (tipo + impacto académico + fecha límite).
+        
+        **Override manual**: Si se proporciona prioridad y/o justificación explícitas, se usan 
+        como valores de override.
+        
         Roles permitidos: ADMINISTRATIVO, COORDINADOR.
 
         **Restricciones críticas**:
         - No se permite modificar una solicitud ya cerrada
-        - Debe registrarse justificación de prioridad
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       requestBody:
@@ -684,8 +694,11 @@ paths:
         - Cambios de estado
         - Cierre con observación
         
+        **Validación de propiedad**: Un ESTUDIANTE solo puede consultar historial de sus propias solicitudes.
+        Si intenta acceder a historial de una solicitud ajena, retorna 404.
+        
         Ordenado por fecha (más antiguos primero).
-        Roles permitidos: ADMINISTRATIVO, COORDINADOR, CONSULTOR.
+        Roles permitidos: ESTUDIANTE (solo propias), ADMINISTRATIVO, COORDINADOR, CONSULTOR.
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       responses:
@@ -696,7 +709,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseHistorialList'
         '404':
-          description: Solicitud no encontrada
+          description: Solicitud no encontrada o (para ESTUDIANTE) no pertenece al usuario
           content:
             application/json:
               schema:
@@ -722,7 +735,11 @@ paths:
         Genera un resumen textual de la solicitud y su contexto o historial.
         Puede usar IA externa o fallback local.
         No modifica datos de la solicitud.
-        Roles permitidos: ADMINISTRATIVO, COORDINADOR, CONSULTOR.
+        
+        **Validación de propiedad**: Un ESTUDIANTE solo puede generar resumen de sus propias solicitudes.
+        Si intenta acceder a una solicitud ajena, retorna 404.
+        
+        Roles permitidos: ESTUDIANTE (solo propias), ADMINISTRATIVO, COORDINADOR, CONSULTOR.
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       responses:
@@ -733,7 +750,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseString'
         '404':
-          description: Solicitud no encontrada
+          description: Solicitud no encontrada o (para ESTUDIANTE) no pertenece al usuario
           content:
             application/json:
               schema:
@@ -1134,16 +1151,24 @@ components:
 
     ClasificarPriorizar:
       type: object
-      required: [tipoSolicitud, prioridad, justificacionPrioridad]
+      required: [tipoSolicitud]
       properties:
         tipoSolicitud:
           $ref: '#/components/schemas/TipoSolicitud'
         prioridad:
           $ref: '#/components/schemas/Prioridad'
+          nullable: true
+          description: |
+            Prioridad - OPCIONAL. Si se omite, se calcula automáticamente por motor de reglas.
+            Si se proporciona, se usa como valor explícito (override).
         justificacionPrioridad:
           type: string
+          nullable: true
           minLength: 5
           maxLength: 500
+          description: |
+            Justificación de prioridad - OPCIONAL. Si se omite, se calcula automáticamente por reglas.
+            Si se proporciona, se usa como valor explícito.
           example: El estudiante tiene matrícula próxima.
 
     IniciarAtencionRequest:

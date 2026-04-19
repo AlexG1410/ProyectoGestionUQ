@@ -13,4 +13,6 @@ import java.util.UUID;
 public interface SolicitudRepository extends JpaRepository<Solicitud, UUID>, JpaSpecificationExecutor<Solicitud> {
 
     Page<Solicitud> findBySolicitante(Usuario solicitante, Pageable pageable);
+    
+    java.util.List<Solicitud> findBySolicitanteId(UUID solicitanteId);
 }

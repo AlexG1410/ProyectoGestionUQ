@@ -19,10 +19,10 @@ public class UsuarioController {
 
     /**
      * GET /api/usuarios/responsables-activos - Listar usuarios activos para asignar como responsables
-     * Roles: ADMINISTRATIVO, COORDINADOR
+     * Roles: ADMINISTRATIVO, COORDINADOR, CONSULTOR
      */
     @GetMapping("/responsables-activos")
-    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
     public ResponseEntity<ApiResponseDTO<List<UsuarioSimpleDTO>>> listarResponsablesActivos() {
         List<UsuarioSimpleDTO> response = usuarioService.listarResponsablesActivos();
         return ResponseEntity.ok(ApiResponseDTO.<List<UsuarioSimpleDTO>>builder()

@@ -9,13 +9,21 @@ import java.time.LocalDate;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class SolicitudCreateDTO {
-    @NotNull
+    /**
+     * Tipo de solicitud - OPCIONAL en registro.
+     * El estudiante registra la solicitud sin conocer su tipo académico exacto.
+     * El tipo se define después en el proceso de CLASIFICACIÓN (RF-02).
+     */
     private TipoSolicitud tipoSolicitud;
-    @NotBlank
-    @Size(min = 10, max = 2000)
+    
+    @NotBlank(message = "La descripción es obligatoria")
+    @Size(min = 10, max = 2000, message = "La descripción debe tener entre 10 y 2000 caracteres")
     private String descripcion;
-    @NotNull
+    
+    @NotNull(message = "El canal de origen es obligatorio")
     private CanalOrigen canalOrigen;
+    
     private ImpactoAcademico impactoAcademico;
+    
     private LocalDate fechaLimite;
 }

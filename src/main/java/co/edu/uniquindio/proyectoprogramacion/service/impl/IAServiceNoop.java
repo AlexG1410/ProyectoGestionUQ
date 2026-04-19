@@ -4,8 +4,12 @@ import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirClasificacionPriorid
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirClasificacionPrioridadResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirPrioridadRequestDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirPrioridadResponseDTO;
+import co.edu.uniquindio.proyectoprogramacion.exception.ResourceNotFoundException;
+import co.edu.uniquindio.proyectoprogramacion.model.entity.Solicitud;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.Prioridad;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.TipoSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.repository.SolicitudRepository;
 import co.edu.uniquindio.proyectoprogramacion.service.IAService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,12 +27,22 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IAServiceNoop implements IAService {
 
+    private final SolicitudRepository solicitudRepository;
+
     /**
      * Genera un resumen básico de la solicitud.
      * Actualmente devuelve un mensaje genérico (sin IA real).
      */
     @Override
-    public String resumirSolicitud(UUID solicitudId) {
+    public String resumirSolicitud(UUID solicitudId, UUID usuarioId, RolUsuario rol) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud no encontrada con ID: " + solicitudId));
+        
+        // Validar propiedad para ESTUDIANTE
+        if (RolUsuario.ESTUDIANTE.equals(rol) && !solicitud.getSolicitante().getId().equals(usuarioId)) {
+            throw new ResourceNotFoundException("Solicitud no encontrada con ID: " + solicitudId);
+        }
+        
         return "Resumen de solicitud [" + solicitudId + "]: " +
                 "Solicitud académica procesada. Para más detalles, consulte los eventos del historial.";
     }

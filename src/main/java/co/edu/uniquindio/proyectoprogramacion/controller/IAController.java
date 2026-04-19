@@ -5,11 +5,15 @@ import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirClasificacionPriorid
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirClasificacionPrioridadResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirPrioridadRequestDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.ia.SugerirPrioridadResponseDTO;
+import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
+import co.edu.uniquindio.proyectoprogramacion.security.CustomUserDetails;
 import co.edu.uniquindio.proyectoprogramacion.service.IAService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -22,13 +26,47 @@ public class IAController {
     private final IAService iaService;
 
     /**
+     * Obtiene el ID del usuario autenticado desde el JWT
+     */
+    private UUID getUsuarioId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails) {
+            return ((CustomUserDetails) auth.getPrincipal()).getId();
+        }
+        throw new IllegalStateException("Usuario no autenticado");
+    }
+
+    /**
+     * Obtiene el rol del usuario autenticado desde el JWT
+     */
+    private RolUsuario getRolUsuario() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities() != null && !auth.getAuthorities().isEmpty()) {
+            String authority = auth.getAuthorities().stream()
+                    .map(a -> a.getAuthority().replace("ROLE_", ""))
+                    .findFirst()
+                    .orElse(null);
+            if (authority != null) {
+                try {
+                    return RolUsuario.valueOf(authority);
+                } catch (IllegalArgumentException e) {
+                    // Continuar
+                }
+            }
+        }
+        throw new IllegalStateException("Rol de usuario no determinable");
+    }
+
+    /**
      * GET /api/solicitudes/{id}/resumen - Generar resumen automático de solicitud (IA)
      * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR, CONSULTOR
      */
     @GetMapping("/{id}/resumen")
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
     public ResponseEntity<ApiResponseDTO<String>> resumir(@PathVariable UUID id) {
-        String response = iaService.resumirSolicitud(id);
+        UUID usuarioId = getUsuarioId();
+        RolUsuario rol = getRolUsuario();
+        String response = iaService.resumirSolicitud(id, usuarioId, rol);
         return ResponseEntity.ok(ApiResponseDTO.<String>builder()
                 .success(true)
                 .message("Resumen generado correctamente")
