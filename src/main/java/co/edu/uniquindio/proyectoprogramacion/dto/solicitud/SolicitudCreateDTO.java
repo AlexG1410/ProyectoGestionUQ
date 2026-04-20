@@ -10,10 +10,11 @@ import java.time.LocalDate;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class SolicitudCreateDTO {
     /**
-     * Tipo de solicitud - OPCIONAL en registro.
-     * El estudiante registra la solicitud sin conocer su tipo académico exacto.
-     * El tipo se define después en el proceso de CLASIFICACIÓN (RF-02).
+     * Tipo de solicitud - OBLIGATORIO en registro (RF-01).
+     * Debe ser especificado al registrar la solicitud.
+     * Valores: REGISTRO_ASIGNATURAS, HOMOLOGACION, CANCELACION_ASIGNATURAS, SOLICITUD_CUPOS, CONSULTA_ACADEMICA, OTRO.
      */
+    @NotNull(message = "El tipo de solicitud es obligatorio")
     private TipoSolicitud tipoSolicitud;
     
     @NotBlank(message = "La descripción es obligatoria")
@@ -26,4 +27,13 @@ public class SolicitudCreateDTO {
     private ImpactoAcademico impactoAcademico;
     
     private LocalDate fechaLimite;
+    
+    /**
+     * Identificación del solicitante real (RF-01).
+     * - Si es ESTUDIANTE: debe coincidir con su propia identificación
+     * - Si es ADMINISTRATIVO/COORDINADOR: puede registrar para otra persona usando su identificación
+     */
+    @NotBlank(message = "La identificación del solicitante es obligatoria")
+    @Size(min = 1, max = 50, message = "La identificación debe tener entre 1 y 50 caracteres")
+    private String identificacionSolicitante;
 }

@@ -141,10 +141,15 @@ paths:
       tags: [Solicitudes]
       summary: Registrar una solicitud académica
       description: |
-        Registra una nueva solicitud académica.
+        Registra una nueva solicitud académica (RF-01).
         La solicitud queda inicialmente en estado REGISTRADA.
-        La identidad del solicitante se obtiene del JWT autenticado, no del cuerpo de la petición.
-        El tipo de solicitud se define posteriormente en el proceso de clasificación.
+        
+        **Campos obligatorios**: tipoSolicitud, descripcion, canalOrigen, identificacionSolicitante.
+        
+        **Determinación del solicitante**:
+        - Si el actor autenticado es ESTUDIANTE: la identificacionSolicitante debe coincidir con su propia identificación.
+        - Si el actor autenticado es ADMINISTRATIVO o COORDINADOR: puede registrar para otro usuario existente usando su identificación.
+        
         Roles permitidos: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR.
       requestBody:
         required: true
@@ -160,7 +165,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseSolicitudResponse'
         '400':
-          description: Error de validación o regla de negocio
+          description: Error de validación o regla de negocio (campo faltante, tipo incorrecto, identificación inexistente, etc.)
           content:
             application/json:
               schema:
@@ -1133,8 +1138,13 @@ components:
 
     SolicitudCreate:
       type: object
-      required: [descripcion, canalOrigen]
+      required: [tipoSolicitud, descripcion, canalOrigen, identificacionSolicitante]
       properties:
+        tipoSolicitud:
+          $ref: '#/components/schemas/TipoSolicitud'
+          description: |
+            Tipo de solicitud - OBLIGATORIO en registro (RF-01).
+            Valores: REGISTRO_ASIGNATURAS, HOMOLOGACION, CANCELACION_ASIGNATURAS, SOLICITUD_CUPOS, CONSULTA_ACADEMICA, OTRO.
         descripcion:
           type: string
           minLength: 10
@@ -1142,6 +1152,15 @@ components:
           example: Solicito revisión de un proceso académico relacionado con homologación.
         canalOrigen:
           $ref: '#/components/schemas/CanalOrigen'
+        identificacionSolicitante:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: |
+            Identificación del solicitante real (RF-01).
+            - Si es ESTUDIANTE: debe coincidir con su propia identificación
+            - Si es ADMINISTRATIVO/COORDINADOR: puede registrar para otra persona usando su identificación
+          example: "1090123456"
         impactoAcademico:
           $ref: '#/components/schemas/ImpactoAcademico'
         fechaLimite:

@@ -50,6 +50,22 @@ public class SolicitudServiceImpl implements SolicitudService {
         Usuario actor = obtenerUsuario(actorId);
         authorizationPolicy.requireAny(actor.getRol(), RolUsuario.ESTUDIANTE, RolUsuario.ADMINISTRATIVO, RolUsuario.COORDINADOR);
 
+        // Determinar el solicitante real según el rol del actor (RF-01)
+        Usuario solicitante;
+        if (actor.getRol() == RolUsuario.ESTUDIANTE) {
+            // Los estudiantes solo pueden registrar para sí mismos
+            if (!dto.getIdentificacionSolicitante().equals(actor.getIdentificacion())) {
+                throw new BusinessException("Un estudiante solo puede registrar solicitudes con su propia identificación");
+            }
+            solicitante = actor;
+        } else {
+            // ADMINISTRATIVO o COORDINADOR pueden registrar para otro usuario
+            solicitante = usuarioRepository.findByIdentificacion(dto.getIdentificacionSolicitante())
+                    .orElseThrow(() -> new BusinessException(
+                            "Usuario con identificación '" + dto.getIdentificacionSolicitante() + "' no encontrado en el sistema"
+                    ));
+        }
+
         Solicitud solicitud = Solicitud.builder()
                 .tipoSolicitud(dto.getTipoSolicitud())
                 .descripcion(dto.getDescripcion())
@@ -58,7 +74,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 .fechaLimite(dto.getFechaLimite())
                 .fechaHoraRegistro(LocalDateTime.now())
                 .estado(EstadoSolicitud.REGISTRADA)
-                .solicitante(actor)
+                .solicitante(solicitante)
                 .build();
 
         solicitud = solicitudRepository.save(solicitud);

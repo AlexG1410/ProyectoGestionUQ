@@ -20,12 +20,12 @@ public class Solicitud {
     private UUID id;
 
     /**
-     * Tipo de solicitud - NULLABLE en REGISTRO (RF-01).
-     * Se define obligatoriamente en CLASIFICACIÓN (RF-02).
+     * Tipo de solicitud - OBLIGATORIO en REGISTRO (RF-01).
+     * Se especifica al registrar la solicitud.
      * Valores: REGISTRO_ASIGNATURAS, HOMOLOGACION, CANCELACION_ASIGNATURAS, SOLICITUD_CUPOS, CONSULTA_ACADEMICA, OTRO.
      */
     @Enumerated(EnumType.STRING)
-    @Column(length = 50)
+    @Column(length = 50, nullable = false)
     private TipoSolicitud tipoSolicitud;
 
     @Column(nullable = false, length = 2000)
