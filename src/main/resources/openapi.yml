@@ -144,11 +144,10 @@ paths:
         Registra una nueva solicitud académica (RF-01).
         La solicitud queda inicialmente en estado REGISTRADA.
         
-        **Campos obligatorios**: tipoSolicitud, descripcion, canalOrigen, identificacionSolicitante.
+        **SEGURIDAD**: La identidad del solicitante se extrae del JWT (usuario autenticado), no del cuerpo de la petición.
+        El usuario que hace POST es siempre el solicitante. Esto previene suplantación de identidad.
         
-        **Determinación del solicitante**:
-        - Si el actor autenticado es ESTUDIANTE: la identificacionSolicitante debe coincidir con su propia identificación.
-        - Si el actor autenticado es ADMINISTRATIVO o COORDINADOR: puede registrar para otro usuario existente usando su identificación.
+        **Campos obligatorios**: tipoSolicitud, descripcion, canalOrigen.
         
         Roles permitidos: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR.
       requestBody:
@@ -165,7 +164,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseSolicitudResponse'
         '400':
-          description: Error de validación o regla de negocio (campo faltante, tipo incorrecto, identificación inexistente, etc.)
+          description: Error de validación o regla de negocio (campo faltante, tipo incorrecto, etc.)
           content:
             application/json:
               schema:
@@ -1138,7 +1137,7 @@ components:
 
     SolicitudCreate:
       type: object
-      required: [tipoSolicitud, descripcion, canalOrigen, identificacionSolicitante]
+      required: [tipoSolicitud, descripcion, canalOrigen]
       properties:
         tipoSolicitud:
           $ref: '#/components/schemas/TipoSolicitud'
@@ -1152,15 +1151,6 @@ components:
           example: Solicito revisión de un proceso académico relacionado con homologación.
         canalOrigen:
           $ref: '#/components/schemas/CanalOrigen'
-        identificacionSolicitante:
-          type: string
-          minLength: 1
-          maxLength: 50
-          description: |
-            Identificación del solicitante real (RF-01).
-            - Si es ESTUDIANTE: debe coincidir con su propia identificación
-            - Si es ADMINISTRATIVO/COORDINADOR: puede registrar para otra persona usando su identificación
-          example: "1090123456"
         impactoAcademico:
           $ref: '#/components/schemas/ImpactoAcademico'
         fechaLimite:

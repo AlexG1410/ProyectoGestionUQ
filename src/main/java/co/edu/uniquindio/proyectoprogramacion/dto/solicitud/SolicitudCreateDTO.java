@@ -29,11 +29,8 @@ public class SolicitudCreateDTO {
     private LocalDate fechaLimite;
     
     /**
-     * Identificación del solicitante real (RF-01).
-     * - Si es ESTUDIANTE: debe coincidir con su propia identificación
-     * - Si es ADMINISTRATIVO/COORDINADOR: puede registrar para otra persona usando su identificación
+     * NOTA SEGURIDAD: La identificación del solicitante se extrae del JWT (SecurityContext),
+     * no del cuerpo de la petición. El usuario autenticado que hace POST es siempre el solicitante.
+     * Esto previene suplantación de identidad.
      */
-    @NotBlank(message = "La identificación del solicitante es obligatoria")
-    @Size(min = 1, max = 50, message = "La identificación debe tener entre 1 y 50 caracteres")
-    private String identificacionSolicitante;
 }

@@ -50,21 +50,10 @@ public class SolicitudServiceImpl implements SolicitudService {
         Usuario actor = obtenerUsuario(actorId);
         authorizationPolicy.requireAny(actor.getRol(), RolUsuario.ESTUDIANTE, RolUsuario.ADMINISTRATIVO, RolUsuario.COORDINADOR);
 
-        // Determinar el solicitante real según el rol del actor (RF-01)
-        Usuario solicitante;
-        if (actor.getRol() == RolUsuario.ESTUDIANTE) {
-            // Los estudiantes solo pueden registrar para sí mismos
-            if (!dto.getIdentificacionSolicitante().equals(actor.getIdentificacion())) {
-                throw new BusinessException("Un estudiante solo puede registrar solicitudes con su propia identificación");
-            }
-            solicitante = actor;
-        } else {
-            // ADMINISTRATIVO o COORDINADOR pueden registrar para otro usuario
-            solicitante = usuarioRepository.findByIdentificacion(dto.getIdentificacionSolicitante())
-                    .orElseThrow(() -> new BusinessException(
-                            "Usuario con identificación '" + dto.getIdentificacionSolicitante() + "' no encontrado en el sistema"
-                    ));
-        }
+        // SEGURIDAD (Prevención de Suplantación): El solicitante es siempre el usuario autenticado (JWT).
+        // La identificación se extrae del SecurityContext, nunca del cuerpo de la petición.
+        // Esto previene que alguien intente registrar una solicitud suplantando la identidad de otro usuario.
+        Usuario solicitante = actor;
 
         Solicitud solicitud = Solicitud.builder()
                 .tipoSolicitud(dto.getTipoSolicitud())
