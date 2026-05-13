@@ -12,4 +12,6 @@ public class FiltroSolicitudesDTO {
     private TipoSolicitud tipo;
     private Prioridad prioridad;
     private UUID responsableId;
+    private String descripcion;
+    private String identificacionSolicitante;
 }

@@ -14,5 +14,5 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, UUID>, Jpa
 
     Page<Solicitud> findBySolicitante(Usuario solicitante, Pageable pageable);
     
-    java.util.List<Solicitud> findBySolicitanteId(UUID solicitanteId);
+    Page<Solicitud> findBySolicitanteId(UUID solicitanteId, Pageable pageable);
 }

@@ -7,4 +7,5 @@ import java.util.UUID;
 public interface AuthService {
     LoginResponseDTO login(LoginRequestDTO dto);
     AuthMeResponseDTO me(UUID userId);
+    RefreshTokenResponseDTO refresh(RefreshTokenRequestDTO dto);
 }

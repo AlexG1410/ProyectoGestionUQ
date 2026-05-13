@@ -23,7 +23,12 @@ public class PriorizacionEngine {
             return new ResultadoPriorizacion(Prioridad.MEDIA, "Prioridad asignada por regla por defecto");
         }
         ReglaPriorizacion regla = reglas.get(0);
-        long dias = fechaLimite == null ? Long.MAX_VALUE : ChronoUnit.DAYS.between(LocalDate.now(), fechaLimite);
+        
+        // Manejar fechaLimite null: si no hay fecha límite, se asume plazo indefinido
+        long dias = fechaLimite == null 
+            ? Long.MAX_VALUE 
+            : ChronoUnit.DAYS.between(LocalDate.now(), fechaLimite);
+        
         Prioridad prioridad = dias <= regla.getDiasAntesVence() ? regla.getPrioridadResultante() : Prioridad.MEDIA;
         return new ResultadoPriorizacion(prioridad, regla.getJustificacionPlantilla());
     }

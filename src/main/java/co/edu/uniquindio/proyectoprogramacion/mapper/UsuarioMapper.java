@@ -13,9 +13,14 @@ public class UsuarioMapper {
 
     public AuthMeResponseDTO toAuthMeResponse(Usuario usuario) {
         return AuthMeResponseDTO.builder()
+                .id(usuario.getId())
                 .username(usuario.getUsername())
+                .nombreCompleto(usuario.getNombres() + " " + usuario.getApellidos())
+                .identificacion(usuario.getIdentificacion())
+                .email(usuario.getEmail())
                 .authenticated(true)
                 .roles(List.of(usuario.getRol()))
+                .activo(usuario.isActivo())
                 .build();
     }
 

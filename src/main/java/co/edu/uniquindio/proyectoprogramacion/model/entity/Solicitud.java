@@ -7,7 +7,6 @@ import co.edu.uniquindio.proyectoprogramacion.exception.BusinessException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
-import jakarta.persistence.*;
 
 
 @Entity
@@ -18,6 +17,9 @@ public class Solicitud {
     @Id
     @GeneratedValue
     private UUID id;
+
+    @Version
+    private Long version;
 
     /**
      * Tipo de solicitud - OBLIGATORIO en REGISTRO (RF-01).

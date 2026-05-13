@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.3'
+    id 'org.springframework.boot' version '3.5.2'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'jacoco'
 }
@@ -10,7 +10,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -23,35 +23,64 @@ ext {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Spring Web - Core REST API support
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Spring WebFlux - Reactive Web (needed for WebClient)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Spring Data & Persistence
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    
+    // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-
+    // JWT Authentication
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
 
+    // API Documentation (Swagger/OpenAPI)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.14'
 
+    // Database - Production
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+
+    // Lombok - Code Generation
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // ============= TEST DEPENDENCIES =============
+    // spring-boot-starter-test includes:
+    // - JUnit 5 (jupiter)
+    // - Mockito (with junit-jupiter integration)
+    // - AssertJ
+    // - Hamcrest
+    // - Spring Test
+    // - JSON Path
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    
+    // Spring Test Autoconfigure - Required for test annotations like @AutoConfigureMockMvc, @WithMockUser
+    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+    
+    // Spring Security Testing
+    testImplementation 'org.springframework.security:spring-security-test'
+    
+    // Database - Testing (H2 in-memory)
+    testImplementation 'com.h2database:h2'
+    
+    // Lombok for tests
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
-
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'com.h2database:h2'
-    testImplementation 'org.mockito:mockito-junit-jupiter'
 }
 
+// Task configuration
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy jacocoTestReport
 }
 
-jacocoTestReport{
+jacocoTestReport {
     dependsOn test
 }

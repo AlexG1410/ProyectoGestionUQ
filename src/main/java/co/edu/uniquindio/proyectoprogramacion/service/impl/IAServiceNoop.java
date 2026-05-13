@@ -12,7 +12,6 @@ import co.edu.uniquindio.proyectoprogramacion.model.enums.TipoSolicitud;
 import co.edu.uniquindio.proyectoprogramacion.repository.SolicitudRepository;
 import co.edu.uniquindio.proyectoprogramacion.service.IAService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +22,6 @@ import java.util.UUID;
  * 
  * En producción, se puede reemplazar con IAServiceLLM que integre con APIs de IA.
  */
-@Service
 @RequiredArgsConstructor
 public class IAServiceNoop implements IAService {
 

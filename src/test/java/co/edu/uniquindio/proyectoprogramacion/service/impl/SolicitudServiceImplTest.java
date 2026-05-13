@@ -27,10 +27,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -704,18 +708,19 @@ class SolicitudServiceImplTest {
         Solicitud solicitud1 = crearSolicitud(UUID.randomUUID(), EstadoSolicitud.REGISTRADA, solicitante);
         Solicitud solicitud2 = crearSolicitud(UUID.randomUUID(), EstadoSolicitud.CLASIFICADA, solicitante);
 
-        when(solicitudRepository.findBySolicitanteId(solicitanteId))
-            .thenReturn(List.of(solicitud1, solicitud2));
+        Page<Solicitud> page = new PageImpl<>(List.of(solicitud1));
+        when(solicitudRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(page);
         when(solicitudMapper.toResponse(any())).thenReturn(new SolicitudResponseDTO());
 
         FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
         filtro.setEstado(EstadoSolicitud.REGISTRADA);
 
         // Act
-        List<SolicitudResponseDTO> result = solicitudService.obtenerMisSolicitudes(solicitanteId, filtro);
+        Page<SolicitudResponseDTO> result = solicitudService.obtenerMisSolicitudes(solicitanteId, filtro, Pageable.unpaged());
 
         // Assert
-        assertEquals(1, result.size());
+        assertEquals(1, result.getSize());
     }
 
     // ============= OBTENER MI SOLICITUD TESTS =============
@@ -770,16 +775,17 @@ class SolicitudServiceImplTest {
         FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
         filtro.setEstado(EstadoSolicitud.CLASIFICADA);
 
-        when(solicitudRepository.findAll(any(Specification.class))).thenReturn(List.of(solicitud));
+        Page<Solicitud> page = new PageImpl<>(List.of(solicitud));
+        when(solicitudRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
         when(solicitudMapper.toResponse(solicitud)).thenReturn(new SolicitudResponseDTO());
 
         // Act
-        List<SolicitudResponseDTO> result = solicitudService.consultar(filtro);
+        Page<SolicitudResponseDTO> result = solicitudService.consultar(filtro, Pageable.unpaged());
 
         // Assert
         assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(solicitudRepository).findAll(any(Specification.class));
+        assertEquals(1, result.getSize());
+        verify(solicitudRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
@@ -788,10 +794,11 @@ class SolicitudServiceImplTest {
         // Arrange
         FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
 
-        when(solicitudRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        Page<Solicitud> emptyPage = new PageImpl<>(Collections.emptyList());
+        when(solicitudRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(emptyPage);
 
         // Act
-        List<SolicitudResponseDTO> result = solicitudService.consultar(filtro);
+        Page<SolicitudResponseDTO> result = solicitudService.consultar(filtro, Pageable.unpaged());
 
         // Assert
         assertNotNull(result);
@@ -857,6 +864,159 @@ class SolicitudServiceImplTest {
         // Assert
         assertNotNull(result);
         verify(historialRepository).findBySolicitudIdOrderByFechaHoraAsc(solicitudId);
+    }
+
+    // ============= PAGINACIÓN TESTS =============
+
+    @Test
+    @DisplayName("consultar debe retornar Page con filtros aplicados")
+    void testConsultar_WithFilters_ReturnsPaginatedResults() {
+        // Arrange
+        Usuario solicitante = crearUsuario(solicitanteId, "estudiante", RolUsuario.ESTUDIANTE);
+        Solicitud solicitud1 = crearSolicitud(solicitudId, EstadoSolicitud.REGISTRADA, solicitante);
+        
+        FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
+        filtro.setEstado(EstadoSolicitud.REGISTRADA);
+        
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        Page<Solicitud> solicitudPage = new PageImpl<>(List.of(solicitud1), pageable, 1);
+        SolicitudResponseDTO responseDTO = new SolicitudResponseDTO();
+
+        when(solicitudRepository.findAll(any(Specification.class), eq(pageable)))
+            .thenReturn(solicitudPage);
+        when(solicitudMapper.toResponse(solicitud1))
+            .thenReturn(responseDTO);
+
+        // Act
+        Page<SolicitudResponseDTO> result = solicitudService.consultar(filtro, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+        assertEquals(0, result.getNumber());
+        verify(solicitudRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("obtenerMisSolicitudes debe retornar Page filtrada por solicitante")
+    void testObtenerMisSolicitudes_WithPagination_ReturnsSolicitudesDelSolicitante() {
+        // Arrange
+        Usuario solicitante = crearUsuario(solicitanteId, "estudiante", RolUsuario.ESTUDIANTE);
+        Solicitud solicitud1 = crearSolicitud(solicitudId, EstadoSolicitud.REGISTRADA, solicitante);
+        Solicitud solicitud2 = crearSolicitud(UUID.randomUUID(), EstadoSolicitud.CLASIFICADA, solicitante);
+        
+        FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+        Page<Solicitud> solicitudPage = new PageImpl<>(List.of(solicitud1, solicitud2), pageable, 2);
+        
+        SolicitudResponseDTO responseDTO1 = new SolicitudResponseDTO();
+        SolicitudResponseDTO responseDTO2 = new SolicitudResponseDTO();
+
+        when(solicitudRepository.findAll(any(Specification.class), eq(pageable)))
+            .thenReturn(solicitudPage);
+        when(solicitudMapper.toResponse(solicitud1)).thenReturn(responseDTO1);
+        when(solicitudMapper.toResponse(solicitud2)).thenReturn(responseDTO2);
+
+        // Act
+        Page<SolicitudResponseDTO> result = solicitudService.obtenerMisSolicitudes(solicitanteId, filtro, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        verify(solicitudRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("obtenerMisSolicitudes debe respetar paginación page=0, size=10")
+    void testObtenerMisSolicitudes_FirstPage_Size10_Success() {
+        // Arrange
+        Usuario solicitante = crearUsuario(solicitanteId, "estudiante", RolUsuario.ESTUDIANTE);
+        List<Solicitud> solicitudes = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            solicitudes.add(crearSolicitud(UUID.randomUUID(), EstadoSolicitud.REGISTRADA, solicitante));
+        }
+        
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        Page<Solicitud> solicitudPage = new PageImpl<>(solicitudes, pageable, 25);
+        
+        FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
+
+        when(solicitudRepository.findAll(any(Specification.class), eq(pageable)))
+            .thenReturn(solicitudPage);
+        when(solicitudMapper.toResponse(any(Solicitud.class)))
+            .thenReturn(new SolicitudResponseDTO());
+
+        // Act
+        Page<SolicitudResponseDTO> result = solicitudService.obtenerMisSolicitudes(solicitanteId, filtro, pageable);
+
+        // Assert
+        assertEquals(10, result.getContent().size());
+        assertEquals(0, result.getNumber());
+        assertEquals(10, result.getSize());
+        assertEquals(25, result.getTotalElements());
+        assertEquals(3, result.getTotalPages()); // 25 / 10 = 2.5 -> 3 páginas
+    }
+
+    @Test
+    @DisplayName("consultar debe retornar Page vacía cuando no hay resultados")
+    void testConsultar_NoResults_ReturnsEmptyPage() {
+        // Arrange
+        FiltroSolicitudesDTO filtro = new FiltroSolicitudesDTO();
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        Page<Solicitud> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        when(solicitudRepository.findAll(any(Specification.class), eq(pageable)))
+            .thenReturn(emptyPage);
+
+        // Act
+        Page<SolicitudResponseDTO> result = solicitudService.consultar(filtro, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(0, result.getTotalElements());
+        assertEquals(0, result.getContent().size());
+        assertEquals(0, result.getTotalPages());
+    }
+
+    @Test
+    @DisplayName("obtenerMiSolicitud debe obtener solicitud específica del solicitante")
+    void testObtenerMiSolicitud_ValidSolicitud_Success() {
+        // Arrange
+        Usuario solicitante = crearUsuario(solicitanteId, "estudiante", RolUsuario.ESTUDIANTE);
+        Solicitud solicitud = crearSolicitud(solicitudId, EstadoSolicitud.REGISTRADA, solicitante);
+        SolicitudResponseDTO responseDTO = new SolicitudResponseDTO();
+
+        when(solicitudRepository.findById(solicitudId))
+            .thenReturn(Optional.of(solicitud));
+        when(solicitudMapper.toResponse(solicitud))
+            .thenReturn(responseDTO);
+
+        // Act
+        SolicitudResponseDTO result = solicitudService.obtenerMiSolicitud(solicitudId, solicitanteId);
+
+        // Assert
+        assertNotNull(result);
+        verify(solicitudRepository).findById(solicitudId);
+    }
+
+    @Test
+    @DisplayName("obtenerMiSolicitud debe lanzar excepción si la solicitud no pertenece al solicitante")
+    void testObtenerMiSolicitud_DifferentSolicitante_ThrowsException() {
+        // Arrange
+        UUID differentSolicitanteId = UUID.randomUUID();
+        Usuario otherSolicitante = crearUsuario(differentSolicitanteId, "otro", RolUsuario.ESTUDIANTE);
+        Solicitud solicitud = crearSolicitud(solicitudId, EstadoSolicitud.REGISTRADA, otherSolicitante);
+
+        when(solicitudRepository.findById(solicitudId))
+            .thenReturn(Optional.of(solicitud));
+
+        // Act & Assert
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () ->
+            solicitudService.obtenerMiSolicitud(solicitudId, solicitanteId)
+        );
+        
+        assertTrue(exception.getMessage().contains("no encontrada o no pertenece"));
     }
 
     // ============= HELPER METHODS =============

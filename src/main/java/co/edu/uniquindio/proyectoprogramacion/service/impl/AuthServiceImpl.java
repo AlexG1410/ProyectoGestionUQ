@@ -3,6 +3,8 @@ package co.edu.uniquindio.proyectoprogramacion.service.impl;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.AuthMeResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.LoginRequestDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.LoginResponseDTO;
+import co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO;
+import co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.exception.ResourceNotFoundException;
 import co.edu.uniquindio.proyectoprogramacion.mapper.UsuarioMapper;
 import co.edu.uniquindio.proyectoprogramacion.model.entity.Usuario;
@@ -11,7 +13,9 @@ import co.edu.uniquindio.proyectoprogramacion.security.CustomUserDetails;
 import co.edu.uniquindio.proyectoprogramacion.security.JwtService;
 import co.edu.uniquindio.proyectoprogramacion.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -25,6 +29,9 @@ public class AuthServiceImpl implements AuthService {
     private final UsuarioRepository usuarioRepository;
     private final JwtService jwtService;
     private final UsuarioMapper usuarioMapper;
+
+    @Value("${app.jwt.expiration-ms}")
+    private long jwtExpirationMs;
 
     @Override
     public LoginResponseDTO login(LoginRequestDTO dto) {
@@ -50,5 +57,32 @@ public class AuthServiceImpl implements AuthService {
         Usuario usuario = usuarioRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         return usuarioMapper.toAuthMeResponse(usuario);
+    }
+
+    @Override
+    public RefreshTokenResponseDTO refresh(RefreshTokenRequestDTO dto) {
+        String token = dto.getToken();
+        
+        // Extraer username del token (verificando validez)
+        String username = jwtService.extractUsername(token);
+        
+        // Cargar usuario
+        Usuario usuario = usuarioRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        
+        // Validar token contra UserDetails
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+        if (!jwtService.isTokenValid(token, userDetails)) {
+            throw new BadCredentialsException("Token inválido o expirado");
+        }
+        
+        // Generar nuevo token
+        String newToken = jwtService.generateToken(userDetails);
+        
+        return RefreshTokenResponseDTO.builder()
+                .token(newToken)
+                .type("Bearer")
+                .expiresIn(jwtExpirationMs / 1000) // Convertir a segundos
+                .build();
     }
 }

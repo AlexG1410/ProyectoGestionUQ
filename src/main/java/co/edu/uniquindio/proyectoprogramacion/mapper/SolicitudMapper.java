@@ -5,9 +5,6 @@ import co.edu.uniquindio.proyectoprogramacion.model.entity.Solicitud;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
 @Component
 @RequiredArgsConstructor
 public class SolicitudMapper {
@@ -17,10 +14,12 @@ public class SolicitudMapper {
     public SolicitudResponseDTO toResponse(Solicitud solicitud) {
         return SolicitudResponseDTO.builder()
                 .id(solicitud.getId())
+                .solicitanteId(solicitud.getSolicitante().getId())
                 .tipoSolicitud(solicitud.getTipoSolicitud())
                 .descripcion(solicitud.getDescripcion())
                 .canalOrigen(solicitud.getCanalOrigen())
                 .impactoAcademico(solicitud.getImpactoAcademico())
+                .fechaLimite(solicitud.getFechaLimite())
                 .fechaHoraRegistro(solicitud.getFechaHoraRegistro())
                 .identificacionSolicitante(solicitud.getSolicitante().getIdentificacion())
                 .estado(solicitud.getEstado())

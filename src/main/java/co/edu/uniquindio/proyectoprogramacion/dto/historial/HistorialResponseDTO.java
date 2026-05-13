@@ -13,5 +13,6 @@ public class HistorialResponseDTO {
     private LocalDateTime fechaHora;
     private AccionHistorial accion;
     private String usuarioResponsable;
+    private String detalle;
     private String observaciones;
 }

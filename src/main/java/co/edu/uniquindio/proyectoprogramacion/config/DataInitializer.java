@@ -13,6 +13,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
+@Profile("!prod")
 @RequiredArgsConstructor
 public class DataInitializer {
 

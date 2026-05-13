@@ -3,6 +3,8 @@ package co.edu.uniquindio.proyectoprogramacion.service.impl;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.AuthMeResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.LoginRequestDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.auth.LoginResponseDTO;
+import co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO;
+import co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.exception.ResourceNotFoundException;
 import co.edu.uniquindio.proyectoprogramacion.mapper.UsuarioMapper;
 import co.edu.uniquindio.proyectoprogramacion.model.entity.Usuario;
@@ -22,6 +24,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +52,8 @@ class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         authService = new AuthServiceImpl(authenticationManager, usuarioRepository, jwtService, usuarioMapper);
+        // Inyectar jwtExpirationMs porque no está siendo autowired en unit test
+        ReflectionTestUtils.setField(authService, "jwtExpirationMs", 86400000L); // 1 día en ms
         usuarioId = UUID.randomUUID();
     }
 
@@ -238,7 +243,7 @@ class AuthServiceImplTest {
         // Arrange
         Usuario usuario = crearUsuario(usuarioId, "juan@uniquindio.edu.co", RolUsuario.ESTUDIANTE);
         AuthMeResponseDTO expectedResponse = new AuthMeResponseDTO();
-        expectedResponse.setId(1L);
+        expectedResponse.setId(usuarioId);
         expectedResponse.setUsername("juan@uniquindio.edu.co");
 
         when(usuarioRepository.findById(usuarioId))
@@ -251,7 +256,7 @@ class AuthServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        assertEquals(1L, result.getId());
+        assertEquals(usuarioId, result.getId());
         assertEquals("juan@uniquindio.edu.co", result.getUsername());
     }
 
@@ -320,7 +325,7 @@ class AuthServiceImplTest {
         usuario.setIdentificacion("1234567890");
 
         AuthMeResponseDTO expectedResponse = new AuthMeResponseDTO();
-        expectedResponse.setId(1L);
+        expectedResponse.setId(usuarioId);
         expectedResponse.setUsername("user@uniquindio.edu.co");
 
         when(usuarioRepository.findById(usuarioId))
@@ -333,8 +338,176 @@ class AuthServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        assertEquals(1L, result.getId());
+        assertEquals(usuarioId, result.getId());
         assertEquals("user@uniquindio.edu.co", result.getUsername());
+    }
+
+    // ============= REFRESH TOKEN TESTS =============
+
+    @Test
+    @DisplayName("refresh debe generar nuevo token cuando el token es válido")
+    void testRefresh_ValidToken_Success() {
+        // Arrange
+        String username = "juan@uniquindio.edu.co";
+        String oldToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.oldtoken...";
+        String newToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.newtoken...";
+        
+        Usuario usuario = crearUsuario(usuarioId, username, RolUsuario.ESTUDIANTE);
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(oldToken)
+                .build();
+
+        when(jwtService.extractUsername(oldToken)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.of(usuario));
+        when(jwtService.isTokenValid(eq(oldToken), any(CustomUserDetails.class))).thenReturn(true);
+        when(jwtService.generateToken(any(CustomUserDetails.class))).thenReturn(newToken);
+
+        // Act
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenResponseDTO result = 
+            authService.refresh(requestDTO);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(newToken, result.getToken());
+        assertEquals("Bearer", result.getType());
+        assertTrue(result.getExpiresIn() > 0); // Verifica que sea positivo en segundos
+    }
+
+    @Test
+    @DisplayName("refresh debe extraer el username correctamente del token")
+    void testRefresh_ShouldExtractUsername() {
+        // Arrange
+        String username = "admin@uniquindio.edu.co";
+        String token = "jwt.token.here";
+        Usuario usuario = crearUsuario(usuarioId, username, RolUsuario.ADMINISTRATIVO);
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(token)
+                .build();
+
+        when(jwtService.extractUsername(token)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.of(usuario));
+        when(jwtService.isTokenValid(eq(token), any(CustomUserDetails.class))).thenReturn(true);
+        when(jwtService.generateToken(any(CustomUserDetails.class))).thenReturn("new-token");
+
+        // Act
+        authService.refresh(requestDTO);
+
+        // Assert
+        verify(jwtService).extractUsername(eq(token));
+    }
+
+    @Test
+    @DisplayName("refresh debe lanzar RuntimeException cuando el token no es válido")
+    void testRefresh_InvalidToken_ThrowsException() {
+        // Arrange
+        String username = "user@uniquindio.edu.co";
+        String invalidToken = "invalid.token.here";
+        Usuario usuario = crearUsuario(usuarioId, username, RolUsuario.COORDINADOR);
+        CustomUserDetails userDetails = new CustomUserDetails(usuario);
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(invalidToken)
+                .build();
+
+        when(jwtService.extractUsername(invalidToken)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.of(usuario));
+        when(jwtService.isTokenValid(eq(invalidToken), any(CustomUserDetails.class))).thenReturn(false);
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+            authService.refresh(requestDTO)
+        );
+
+        assertEquals("Token inválido o expirado", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("refresh debe lanzar ResourceNotFoundException cuando el usuario no existe")
+    void testRefresh_UserNotFound_ThrowsException() {
+        // Arrange
+        String username = "noexiste@uniquindio.edu.co";
+        String token = "jwt.token.here";
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(token)
+                .build();
+
+        when(jwtService.extractUsername(token)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () ->
+            authService.refresh(requestDTO)
+        );
+
+        assertEquals("Usuario no encontrado", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("refresh debe generar nuevo token usando CustomUserDetails del usuario")
+    void testRefresh_ShouldGenerateNewTokenWithUserDetails() {
+        // Arrange
+        String username = "coordinador@uniquindio.edu.co";
+        String oldToken = "old.token.here";
+        String newToken = "new.token.here";
+        
+        Usuario usuario = crearUsuario(usuarioId, username, RolUsuario.COORDINADOR);
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(oldToken)
+                .build();
+
+        when(jwtService.extractUsername(oldToken)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.of(usuario));
+        when(jwtService.isTokenValid(eq(oldToken), any(CustomUserDetails.class))).thenReturn(true);
+        when(jwtService.generateToken(any(CustomUserDetails.class))).thenReturn(newToken);
+
+        ArgumentCaptor<CustomUserDetails> detailsCaptor = ArgumentCaptor.forClass(CustomUserDetails.class);
+
+        // Act
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenResponseDTO result = authService.refresh(requestDTO);
+
+        // Assert
+        verify(jwtService).generateToken(detailsCaptor.capture());
+        CustomUserDetails capturedDetails = detailsCaptor.getValue();
+        assertNotNull(capturedDetails);
+    }
+
+    @Test
+    @DisplayName("refresh debe retornar RefreshTokenResponseDTO con expiresIn en segundos")
+    void testRefresh_ShouldReturnExpiresInSeconds() {
+        // Arrange
+        String username = "admin@uniquindio.edu.co";
+        String token = "jwt.token";
+        Usuario usuario = crearUsuario(usuarioId, username, RolUsuario.ADMINISTRATIVO);
+        
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO requestDTO = 
+            co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenRequestDTO.builder()
+                .token(token)
+                .build();
+
+        when(jwtService.extractUsername(token)).thenReturn(username);
+        when(usuarioRepository.findByUsername(username)).thenReturn(Optional.of(usuario));
+        when(jwtService.isTokenValid(eq(token), any(CustomUserDetails.class))).thenReturn(true);
+        when(jwtService.generateToken(any(CustomUserDetails.class))).thenReturn("new-jwt-token");
+
+        // Act
+        co.edu.uniquindio.proyectoprogramacion.dto.auth.RefreshTokenResponseDTO result = 
+            authService.refresh(requestDTO);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("new-jwt-token", result.getToken());
+        assertEquals("Bearer", result.getType());
+        assertTrue(result.getExpiresIn() > 0); // Verifica que sea positivo en segundos
     }
 
     // ============= HELPER METHODS =============

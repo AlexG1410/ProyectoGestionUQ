@@ -22,6 +22,8 @@ import co.edu.uniquindio.proyectoprogramacion.service.rules.AuthorizationPolicy;
 import co.edu.uniquindio.proyectoprogramacion.service.rules.EstadoMachine;
 import co.edu.uniquindio.proyectoprogramacion.service.rules.PriorizacionEngine;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,45 +74,33 @@ public class SolicitudServiceImpl implements SolicitudService {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<SolicitudResponseDTO> consultar(FiltroSolicitudesDTO filtro) {
+    public Page<SolicitudResponseDTO> consultar(FiltroSolicitudesDTO filtro, Pageable pageable) {
         return solicitudRepository.findAll(SolicitudSpecification.conFiltros(
-                        filtro.getEstado(), filtro.getTipo(), filtro.getPrioridad(), filtro.getResponsableId()))
-                .stream()
-                .map(solicitudMapper::toResponse)
-                .toList();
+                        filtro.getEstado(), filtro.getTipo(), filtro.getPrioridad(), filtro.getResponsableId(),
+                        filtro.getDescripcion(), filtro.getIdentificacionSolicitante()), pageable)
+                .map(solicitudMapper::toResponse);
     }
+
     @Override
     @Transactional(readOnly = true)
     public SolicitudResponseDTO obtenerPorId(UUID solicitudId, UUID usuarioId, RolUsuario rol) {
         Solicitud solicitud = obtenerSolicitud(solicitudId);
-        
+
         // Validar propiedad para ESTUDIANTE
         if (RolUsuario.ESTUDIANTE.equals(rol) && !solicitud.getSolicitante().getId().equals(usuarioId)) {
             throw new ResourceNotFoundException("Solicitud no encontrada con ID: " + solicitudId);
         }
-        
+
         return solicitudMapper.toResponse(solicitud);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<SolicitudResponseDTO> obtenerMisSolicitudes(UUID solicitanteId, FiltroSolicitudesDTO filtro) {
-        return solicitudRepository.findBySolicitanteId(solicitanteId)
-                .stream()
-                .filter(s -> {
-                    if (filtro.getEstado() != null && !s.getEstado().equals(filtro.getEstado())) {
-                        return false;
-                    }
-                    if (filtro.getTipo() != null && !s.getTipoSolicitud().equals(filtro.getTipo())) {
-                        return false;
-                    }
-                    if (filtro.getPrioridad() != null && !s.getPrioridad().equals(filtro.getPrioridad())) {
-                        return false;
-                    }
-                    return true;
-                })
-                .map(solicitudMapper::toResponse)
-                .toList();
+    public Page<SolicitudResponseDTO> obtenerMisSolicitudes(UUID solicitanteId, FiltroSolicitudesDTO filtro, Pageable pageable) {
+        // Usar Specification para aplicar filtros basados en solicitante
+        return solicitudRepository.findAll(SolicitudSpecification.conFiltrosSolicitante(
+                solicitanteId, filtro.getEstado(), filtro.getTipo(), filtro.getPrioridad()), pageable)
+                .map(solicitudMapper::toResponse);
     }
 
     @Override

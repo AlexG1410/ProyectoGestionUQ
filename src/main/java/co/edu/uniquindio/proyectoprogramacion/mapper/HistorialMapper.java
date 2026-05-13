@@ -2,9 +2,6 @@ package co.edu.uniquindio.proyectoprogramacion.mapper;
 
 import co.edu.uniquindio.proyectoprogramacion.dto.historial.HistorialResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.model.entity.HistorialSolicitud;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,6 +12,7 @@ public class HistorialMapper {
                 .fechaHora(historial.getFechaHora())
                 .accion(historial.getAccion())
                 .usuarioResponsable(historial.getActor().getUsername())
+                .detalle(historial.getDetalle())
                 .observaciones(historial.getObservaciones())
                 .build();
     }

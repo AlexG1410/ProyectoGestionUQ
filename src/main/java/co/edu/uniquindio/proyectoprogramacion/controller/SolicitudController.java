@@ -7,15 +7,17 @@ import co.edu.uniquindio.proyectoprogramacion.model.enums.EstadoSolicitud;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.Prioridad;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.TipoSolicitud;
-import co.edu.uniquindio.proyectoprogramacion.security.CustomUserDetails;
 import co.edu.uniquindio.proyectoprogramacion.service.SolicitudService;
+import co.edu.uniquindio.proyectoprogramacion.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,38 +29,7 @@ import java.util.UUID;
 public class SolicitudController {
 
     private final SolicitudService solicitudService;
-
-    /**
-     * Obtiene el ID del usuario autenticado desde el JWT
-     */
-    private UUID getUsuarioId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails) {
-            return ((CustomUserDetails) auth.getPrincipal()).getId();
-        }
-        throw new IllegalStateException("Usuario no autenticado");
-    }
-
-    /**
-     * Obtiene el rol del usuario autenticado desde el JWT
-     */
-    private RolUsuario getRolUsuario() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getAuthorities() != null && !auth.getAuthorities().isEmpty()) {
-            String authority = auth.getAuthorities().stream()
-                    .map(a -> a.getAuthority().replace("ROLE_", ""))
-                    .findFirst()
-                    .orElse(null);
-            if (authority != null) {
-                try {
-                    return RolUsuario.valueOf(authority);
-                } catch (IllegalArgumentException e) {
-                    // Continuar
-                }
-            }
-        }
-        throw new IllegalStateException("Rol de usuario no determinable");
-    }
+    private final SecurityUtils securityUtils;
 
     /**
      * POST /api/solicitudes - Registrar nueva solicitud
@@ -68,7 +39,7 @@ public class SolicitudController {
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR')")
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> registrar(
             @Valid @RequestBody SolicitudCreateDTO dto) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.registrar(dto, usuarioId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDTO.<SolicitudResponseDTO>builder()
@@ -81,14 +52,19 @@ public class SolicitudController {
     /**
      * GET /api/solicitudes - Consultar solicitudes con filtros
      * Roles: ADMINISTRATIVO, COORDINADOR, CONSULTOR
+     * Query params: page=0&size=20&estado=REGISTRADA&tipo=HOMOLOGACION&prioridad=ALTA&responsableId=...
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
-    public ResponseEntity<ApiResponseDTO<List<SolicitudResponseDTO>>> consultar(
+    public ResponseEntity<ApiResponseDTO<Page<SolicitudResponseDTO>>> consultar(
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String tipoSolicitud,
             @RequestParam(required = false) String prioridad,
-            @RequestParam(required = false) UUID responsableId) {
+            @RequestParam(required = false) UUID responsableId,
+            @RequestParam(required = false) String descripcion,
+            @RequestParam(required = false) String identificacionSolicitante,
+            @PageableDefault(size = 20, sort = "fechaHoraRegistro", direction = Sort.Direction.DESC) Pageable pageable) {
         
         // Convertir strings a enums de manera segura
         EstadoSolicitud estadoEnum = null;
@@ -103,9 +79,10 @@ public class SolicitudController {
             }
         }
         
-        if (tipo != null && !tipo.isEmpty()) {
+        String tipoFiltro = tipo != null && !tipo.isEmpty() ? tipo : tipoSolicitud;
+        if (tipoFiltro != null && !tipoFiltro.isEmpty()) {
             try {
-                tipoEnum = TipoSolicitud.valueOf(tipo.toUpperCase());
+                tipoEnum = TipoSolicitud.valueOf(tipoFiltro.toUpperCase());
             } catch (IllegalArgumentException e) {
                 // Si el valor no es válido, ignorar y buscar sin este filtro
             }
@@ -124,10 +101,12 @@ public class SolicitudController {
                 .tipo(tipoEnum)
                 .prioridad(prioridadEnum)
                 .responsableId(responsableId)
+                .descripcion(descripcion)
+                .identificacionSolicitante(identificacionSolicitante)
                 .build();
         
-        List<SolicitudResponseDTO> response = solicitudService.consultar(filtro);
-        return ResponseEntity.ok(ApiResponseDTO.<List<SolicitudResponseDTO>>builder()
+        Page<SolicitudResponseDTO> response = solicitudService.consultar(filtro, pageable);
+        return ResponseEntity.ok(ApiResponseDTO.<Page<SolicitudResponseDTO>>builder()
                 .success(true)
                 .message("Solicitudes consultadas correctamente")
                 .data(response)
@@ -137,12 +116,14 @@ public class SolicitudController {
     /**
      * GET /api/solicitudes/mis-solicitudes - Consultar mis solicitudes (usuario autenticado)
      * Roles: ESTUDIANTE, ADMINISTRATIVO, COORDINADOR
+     * Query params: page=0&size=20&estado=REGISTRADA
      */
     @GetMapping("/mis-solicitudes")
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR')")
-    public ResponseEntity<ApiResponseDTO<List<SolicitudResponseDTO>>> misSolicitudes(
-            @RequestParam(required = false) String estado) {
-        UUID usuarioId = getUsuarioId();
+    public ResponseEntity<ApiResponseDTO<Page<SolicitudResponseDTO>>> misSolicitudes(
+            @RequestParam(required = false) String estado,
+            @PageableDefault(size = 20, sort = "fechaHoraRegistro", direction = Sort.Direction.DESC) Pageable pageable) {
+        UUID usuarioId = securityUtils.getUsuarioId();
         
         EstadoSolicitud estadoEnum = null;
         if (estado != null && !estado.isEmpty()) {
@@ -157,8 +138,8 @@ public class SolicitudController {
                 .estado(estadoEnum)
                 .build();
         
-        List<SolicitudResponseDTO> response = solicitudService.obtenerMisSolicitudes(usuarioId, filtro);
-        return ResponseEntity.ok(ApiResponseDTO.<List<SolicitudResponseDTO>>builder()
+        Page<SolicitudResponseDTO> response = solicitudService.obtenerMisSolicitudes(usuarioId, filtro, pageable);
+        return ResponseEntity.ok(ApiResponseDTO.<Page<SolicitudResponseDTO>>builder()
                 .success(true)
                 .message("Mis solicitudes obtenidas correctamente")
                 .data(response)
@@ -172,7 +153,7 @@ public class SolicitudController {
     @GetMapping("/mis-solicitudes/{id}")
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR')")
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> miSolicitud(@PathVariable UUID id) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.obtenerMiSolicitud(id, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -188,8 +169,8 @@ public class SolicitudController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> obtenerPorId(@PathVariable UUID id) {
-        UUID usuarioId = getUsuarioId();
-        RolUsuario rol = getRolUsuario();
+        UUID usuarioId = securityUtils.getUsuarioId();
+        RolUsuario rol = securityUtils.getRolUsuario();
         SolicitudResponseDTO response = solicitudService.obtenerPorId(id, usuarioId, rol);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -207,7 +188,7 @@ public class SolicitudController {
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> clasificarPriorizar(
             @PathVariable UUID id,
             @Valid @RequestBody ClasificarPriorizarDTO dto) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.clasificarPriorizar(id, dto, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -225,7 +206,7 @@ public class SolicitudController {
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> asignarResponsable(
             @PathVariable UUID id,
             @Valid @RequestBody AsignarResponsableDTO dto) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.asignarResponsable(id, dto, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -242,9 +223,11 @@ public class SolicitudController {
     @PreAuthorize("hasAnyRole('ADMINISTRATIVO', 'COORDINADOR')")
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> iniciarAtencion(
             @PathVariable UUID id,
-            @RequestParam(required = false, defaultValue = "") String observacion) {
-        UUID usuarioId = getUsuarioId();
-        SolicitudResponseDTO response = solicitudService.iniciarAtencion(id, observacion, usuarioId);
+            @Valid @RequestBody(required = false) IniciarAtencionDTO dto,
+            @RequestParam(required = false) String observacion) {
+        UUID usuarioId = securityUtils.getUsuarioId();
+        String observacionFinal = dto != null && dto.getObservacion() != null ? dto.getObservacion() : observacion;
+        SolicitudResponseDTO response = solicitudService.iniciarAtencion(id, observacionFinal == null ? "" : observacionFinal, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
                 .message("Atención iniciada correctamente")
@@ -261,7 +244,7 @@ public class SolicitudController {
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> marcarAtendida(
             @PathVariable UUID id,
             @Valid @RequestBody MarcarAtendidoDTO dto) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.marcarAtendida(id, dto, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -279,7 +262,7 @@ public class SolicitudController {
     public ResponseEntity<ApiResponseDTO<SolicitudResponseDTO>> cerrar(
             @PathVariable UUID id,
             @Valid @RequestBody CerrarSolicitudDTO dto) {
-        UUID usuarioId = getUsuarioId();
+        UUID usuarioId = securityUtils.getUsuarioId();
         SolicitudResponseDTO response = solicitudService.cerrar(id, dto, usuarioId);
         return ResponseEntity.ok(ApiResponseDTO.<SolicitudResponseDTO>builder()
                 .success(true)
@@ -295,8 +278,8 @@ public class SolicitudController {
     @GetMapping("/{id}/historial")
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'ADMINISTRATIVO', 'COORDINADOR', 'CONSULTOR')")
     public ResponseEntity<ApiResponseDTO<List<HistorialResponseDTO>>> historial(@PathVariable UUID id) {
-        UUID usuarioId = getUsuarioId();
-        RolUsuario rol = getRolUsuario();
+        UUID usuarioId = securityUtils.getUsuarioId();
+        RolUsuario rol = securityUtils.getRolUsuario();
         List<HistorialResponseDTO> response = solicitudService.historial(id, usuarioId, rol);
         return ResponseEntity.ok(ApiResponseDTO.<List<HistorialResponseDTO>>builder()
                 .success(true)

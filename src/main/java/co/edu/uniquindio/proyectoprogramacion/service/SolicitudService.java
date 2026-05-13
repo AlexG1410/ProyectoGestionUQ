@@ -3,14 +3,16 @@ package co.edu.uniquindio.proyectoprogramacion.service;
 import co.edu.uniquindio.proyectoprogramacion.dto.historial.HistorialResponseDTO;
 import co.edu.uniquindio.proyectoprogramacion.dto.solicitud.*;
 import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.*;
 
 public interface SolicitudService {
     SolicitudResponseDTO registrar(SolicitudCreateDTO dto, UUID actorId);
-    List<SolicitudResponseDTO> consultar(FiltroSolicitudesDTO filtro);
+    Page<SolicitudResponseDTO> consultar(FiltroSolicitudesDTO filtro, Pageable pageable);
     SolicitudResponseDTO obtenerPorId(UUID solicitudId, UUID usuarioId, RolUsuario rol);
-    List<SolicitudResponseDTO> obtenerMisSolicitudes(UUID solicitanteId, FiltroSolicitudesDTO filtro);
+    Page<SolicitudResponseDTO> obtenerMisSolicitudes(UUID solicitanteId, FiltroSolicitudesDTO filtro, Pageable pageable);
     SolicitudResponseDTO obtenerMiSolicitud(UUID solicitudId, UUID solicitanteId);
     SolicitudResponseDTO clasificarPriorizar(UUID solicitudId, ClasificarPriorizarDTO dto, UUID actorId);
     SolicitudResponseDTO asignarResponsable(UUID solicitudId, AsignarResponsableDTO dto, UUID actorId);

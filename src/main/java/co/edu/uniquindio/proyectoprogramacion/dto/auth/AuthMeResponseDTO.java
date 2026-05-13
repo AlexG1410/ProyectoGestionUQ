@@ -4,6 +4,7 @@ import co.edu.uniquindio.proyectoprogramacion.model.enums.RolUsuario;
 import lombok.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -11,10 +12,11 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class AuthMeResponseDTO {
-    private Long id;
+    private UUID id;
     private String username;
     private String nombreCompleto;
     private String identificacion;
+    private String email;
     private boolean authenticated;
     private List<RolUsuario> roles;
     private boolean activo;
