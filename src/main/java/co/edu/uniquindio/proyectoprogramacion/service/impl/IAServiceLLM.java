@@ -16,7 +16,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
+import co.edu.uniquindio.proyectoprogramacion.model.entity.HistorialSolicitud;
+import co.edu.uniquindio.proyectoprogramacion.model.entity.Usuario;
+import co.edu.uniquindio.proyectoprogramacion.repository.HistorialSolicitudRepository;
+import org.springframework.transaction.annotation.Transactional;
 
+
+import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -45,25 +51,37 @@ public class IAServiceLLM implements IAService {
 
     private final LLMClient llmClient;
     private final SolicitudRepository solicitudRepository;
+    private final HistorialSolicitudRepository historialRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public String resumirSolicitud(UUID solicitudId, UUID usuarioId, RolUsuario rol) {
-        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+        Solicitud solicitud = solicitudRepository.findByIdWithUsuarios(solicitudId)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud no encontrada con ID: " + solicitudId));
 
-        // Validar propiedad para ESTUDIANTE
         if (RolUsuario.ESTUDIANTE.equals(rol) && !solicitud.getSolicitante().getId().equals(usuarioId)) {
             throw new ResourceNotFoundException("Solicitud no encontrada con ID: " + solicitudId);
         }
 
+        List<HistorialSolicitud> historial = historialRepository.findBySolicitudIdOrderByFechaHoraAsc(solicitudId);
+
         try {
-            String prompt = construirPromptResumen(solicitud);
+            String prompt = construirPromptResumen(solicitud, historial);
             String resumen = llmClient.sendPrompt(prompt);
+
+            if (resumen == null || resumen.isBlank()) {
+                throw new IllegalStateException("Gemini devolvió una respuesta vacía");
+            }
+
+            if (resumen.trim().length() < 120) {
+                throw new IllegalStateException("Gemini devolvió un resumen demasiado corto o incompleto");
+            }
+
             log.info("Resumen generado exitosamente para solicitud {}", solicitudId);
-            return resumen;
+            return resumen.trim();
         } catch (Exception e) {
             log.warn("Error al generar resumen con Gemini, usando fallback: {}", e.getMessage());
-            return generarResumenFallback(solicitud);
+            return generarResumenFallback(solicitud, historial);
         }
     }
 
@@ -92,37 +110,84 @@ public class IAServiceLLM implements IAService {
         }
     }
 
+    private String nombreCompleto(Usuario usuario) {
+        if (usuario == null) {
+            return "No registra";
+        }
+
+        String nombres = usuario.getNombres() != null ? usuario.getNombres() : "";
+        String apellidos = usuario.getApellidos() != null ? usuario.getApellidos() : "";
+
+        String nombreCompleto = (nombres + " " + apellidos).trim();
+
+        return nombreCompleto.isEmpty() ? usuario.getUsername() : nombreCompleto;
+    }
+
+    private String valor(Object valor) {
+        return valor == null ? "No registra" : valor.toString();
+    }
+
     // ============= CONSTRUCTORES DE PROMPTS =============
 
-    private String construirPromptResumen(Solicitud solicitud) {
+    private String construirPromptResumen(Solicitud solicitud, List<HistorialSolicitud> historial) {
+        String responsable = solicitud.getResponsable() != null
+                ? nombreCompleto(solicitud.getResponsable())
+                : "Sin responsable asignado";
+
+        String eventosHistorial = historial.isEmpty()
+                ? "Sin eventos registrados en historial."
+                : historial.stream()
+                .map(h -> "- %s | Acción: %s | Actor: %s | Detalle: %s | Observaciones: %s"
+                        .formatted(
+                                h.getFechaHora(),
+                                h.getAccion(),
+                                nombreCompleto(h.getActor()),
+                                valor(h.getDetalle()),
+                                valor(h.getObservaciones())
+                        ))
+                .collect(Collectors.joining("\n"));
+
         return """
-                Genera un resumen ejecutivo y profesional (máximo 150 palabras) de la siguiente solicitud académica:
-                
-                Tipo: %s
-                Estado: %s
-                Prioridad: %s
-                Descripción: %s
-                Canal origen: %s
-                Solicitante: %s %s
-                Fecha registro: %s
-                
-                El resumen debe ser:
-                - Claro y conciso
-                - Profesional
-                - Útil para responsables académicos
-                - Enfocado en puntos críticos
-                
-                Responde SOLO con el resumen, sin explicaciones adicionales.
-                """.formatted(
-                        solicitud.getTipoSolicitud(),
-                        solicitud.getEstado(),
-                        solicitud.getPrioridad(),
-                        solicitud.getDescripcion(),
-                        solicitud.getCanalOrigen(),
-                        solicitud.getSolicitante().getNombres(),
-                        solicitud.getSolicitante().getApellidos(),
-                        solicitud.getFechaHoraRegistro()
-                );
+            Genera un resumen académico claro, completo y profesional en español.
+
+            Información actual:
+            - Tipo: %s
+            - Estado actual: %s
+            - Prioridad: %s
+            - Impacto académico: %s
+            - Canal de origen: %s
+            - Fecha de registro: %s
+            - Fecha límite: %s
+            - Solicitante: %s
+            - Responsable: %s
+            - Descripción: %s
+
+            Historial de la solicitud:
+            %s
+
+            Instrucciones:
+            - Redacta entre 80 y 150 palabras.
+            - No hagas una frase corta.
+            - No cortes la respuesta.
+            - Explica qué solicita el estudiante.
+            - Menciona el estado actual de la solicitud.
+            - Menciona la prioridad y el impacto académico si son relevantes.
+            - Resume los eventos importantes del historial.
+            - No incluyas el ID completo de la solicitud.
+            - Responde solo con el resumen final, sin títulos ni listas.
+            """.formatted(
+                valor(solicitud.getTipoSolicitud()),
+                valor(solicitud.getEstado()),
+                valor(solicitud.getPrioridad()),
+                valor(solicitud.getImpactoAcademico()),
+                valor(solicitud.getCanalOrigen()),
+                valor(solicitud.getFechaHoraRegistro()),
+                valor(solicitud.getFechaLimite()),
+                nombreCompleto(solicitud.getSolicitante()),
+                responsable,
+                valor(solicitud.getDescripcion()),
+                eventosHistorial
+        );
     }
 
     private String construirPromptSugerirPrioridad(SugerirPrioridadRequestDTO dto) {
@@ -306,18 +371,31 @@ public class IAServiceLLM implements IAService {
 
     // ============= FALLBACKS (RF-11: FUNCIONAMIENTO SIN IA) =============
 
-    private String generarResumenFallback(Solicitud solicitud) {
-        return String.format(
-                "Resumen de Solicitud %s: %s %s. " +
-                "Tipo: %s | Estado: %s | Prioridad: %s | " +
-                "Descripción: %s",
-                solicitud.getId(),
-                solicitud.getSolicitante().getNombres(),
-                solicitud.getSolicitante().getApellidos(),
-                solicitud.getTipoSolicitud(),
-                solicitud.getEstado(),
-                solicitud.getPrioridad(),
-                solicitud.getDescripcion()
+    private String generarResumenFallback(Solicitud solicitud, List<HistorialSolicitud> historial) {
+        String responsable = solicitud.getResponsable() != null
+                ? nombreCompleto(solicitud.getResponsable())
+                : "sin responsable asignado";
+
+        String ultimoEvento = historial.isEmpty()
+                ? "No hay eventos adicionales registrados en el historial."
+                : historial.get(historial.size() - 1).getAccion() + " - " +
+                valor(historial.get(historial.size() - 1).getDetalle());
+
+        return """
+            La solicitud académica fue registrada por %s y actualmente se encuentra en estado %s.
+            Su tipo es %s, con prioridad %s e impacto académico %s.
+            La descripción registrada es: "%s".
+            El responsable actual es %s.
+            Último evento del historial: %s.
+            """.formatted(
+                nombreCompleto(solicitud.getSolicitante()),
+                valor(solicitud.getEstado()),
+                valor(solicitud.getTipoSolicitud()),
+                valor(solicitud.getPrioridad()),
+                valor(solicitud.getImpactoAcademico()),
+                valor(solicitud.getDescripcion()),
+                responsable,
+                ultimoEvento
         );
     }
 

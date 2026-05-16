@@ -66,6 +66,20 @@ public class DataInitializer {
                         .creadoEn(java.time.LocalDateTime.now())
                         .build());
             }
+
+            if (!usuarioRepository.existsByUsername("consultor1")) {
+                usuarioRepository.save(Usuario.builder()
+                        .username("consultor1")
+                        .passwordHash(passwordEncoder.encode("123456"))
+                        .nombres("Consultor")
+                        .apellidos("Académico")
+                        .identificacion("1004")
+                        .email("consultor1@uniquindio.edu.co")
+                        .rol(RolUsuario.CONSULTOR)
+                        .activo(true)
+                        .creadoEn(java.time.LocalDateTime.now())
+                        .build());
+            }
         };
     }
 
@@ -98,7 +112,7 @@ public class DataInitializer {
                         .permitida(true)
                         .build());
 
-                // Transiciones de reclasificación (si es necesario ajustar)
+                // Transiciones de reclasificación, si es necesario ajustar
                 transicionEstadoRepository.save(TransicionEstado.builder()
                         .desde(EstadoSolicitud.CLASIFICADA)
                         .hacia(EstadoSolicitud.CLASIFICADA)
